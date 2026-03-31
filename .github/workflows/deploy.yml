@@ -1,4 +1,4 @@
-name: Deploy to Hostinger
+name: Hostinger Deploy
 
 on:
   push:
@@ -9,17 +9,10 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install Dependencies
-        run: npm install --production
-
-      - name: Deploy via FTP
+      - name: Deploy to Hostinger
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
@@ -31,4 +24,5 @@ jobs:
             **/.git*
             **/.git*/**
             **/node_modules/**
-            **/.env 
+            **/.env
+            **/.github/**
