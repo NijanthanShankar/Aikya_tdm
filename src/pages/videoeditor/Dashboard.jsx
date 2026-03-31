@@ -29,7 +29,7 @@ const PLATFORM_OPTIONS = [
   { value: 'Instagram',  label: 'Instagram'  },
   { value: 'Facebook',   label: 'Facebook'   },
   { value: 'LinkedIn',   label: 'LinkedIn'   },
-  { value: 'Testimonials',     label: 'Testimonials'     },
+  { value: 'Testimonials',     label: 'Testimonials '     },
   { value: 'Poster',     label: 'Poster'     },
   { value: 'Stories',     label: 'Stories'     },
   { value: 'Other',      label: 'Other'      },
