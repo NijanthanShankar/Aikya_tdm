@@ -1,6 +1,6 @@
 <?php
 // ─────────────────────────────────────────────────────────────
-//  AgencyHub — Auth API
+//  Aikya Task Portal — Auth API
 //  POST /api/auth.php?action=login   { email, password }
 //  POST /api/auth.php?action=logout
 //  GET  /api/auth.php?action=me
@@ -11,7 +11,7 @@ require_once 'helpers.php';
 
 $action = $_GET['action'] ?? '';
 
-// ── GET /me — return current session user ─────────────────────
+// ── GET /me ────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'me') {
     if (empty($_SESSION['user'])) {
         respond(['user' => null]);
@@ -19,15 +19,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'me') {
     respond(['user' => $_SESSION['user']]);
 }
 
-// ── POST /login ───────────────────────────────────────────────
+// ── POST /login ────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'login') {
     $body     = getBody();
-    $email    = trim($body['email'] ?? '');
+    $email    = trim($body['email']    ?? '');
     $password = $body['password'] ?? '';
 
-    if (!$email || !$password) {
-        respondError('Email and password are required.');
-    }
+    if (!$email || !$password) respondError('Email and password are required.');
 
     $db   = getDB();
     $stmt = $db->prepare('SELECT * FROM users WHERE email = ? LIMIT 1');
@@ -38,24 +36,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'login') {
         respondError('Invalid email or password.', 401);
     }
 
-    // Store in session (exclude password)
-    $session = [
-        'id'     => $user['id'],
-        'name'   => $user['name'],
-        'email'  => $user['email'],
-        'role'   => $user['role'],
-        'color'  => $user['color'],
-        'avatar' => $user['avatar'],
-    ];
+    $session = buildSession($user);
     $_SESSION['user'] = $session;
-
     respond(['user' => $session]);
 }
 
-// ── POST /logout ──────────────────────────────────────────────
+// ── POST /logout ───────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'logout') {
     session_destroy();
     respond(['success' => true]);
 }
 
 respondError('Invalid action.', 404);
+
+// ── Helper ─────────────────────────────────────────────────────
+function buildSession(array $user): array {
+    return [
+        'id'         => $user['id'],
+        'name'       => $user['name'],
+        'email'      => $user['email'],
+        'role'       => $user['role'],
+        'color'      => $user['color']      ?? '#7c3aed',
+        'avatar'     => $user['avatar']     ?? '??',
+        'phone'      => $user['phone']      ?? '',
+        'department' => $user['department'] ?? '',
+        'avatarUrl'  => $user['avatar_url'] ?? '',
+    ];
+}

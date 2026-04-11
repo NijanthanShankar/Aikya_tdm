@@ -42,6 +42,7 @@ export function AuthProvider({ children }) {
     setUsers([]);
   };
 
+  // ── Admin: manage team members ────────────────────────────────
   const createUser = async (payload) => {
     try {
       const { user } = await api.users.create(payload);
@@ -56,8 +57,7 @@ export function AuthProvider({ children }) {
     try {
       const { user } = await api.users.update(id, updates);
       setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, ...user } : u)));
-      if (currentUser?.id === id) setCurrentUser((prev) => ({ ...prev, ...user }));
-      return { success: true };
+      return { success: true, user };
     } catch (err) {
       return { success: false, error: err.message };
     }
@@ -73,11 +73,32 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // ── Self: update own profile ──────────────────────────────────
+  const updateProfile = async (data) => {
+    try {
+      const { user } = await api.users.updateSelf(data);
+      setCurrentUser((prev) => ({ ...prev, ...user }));
+      return { success: true, user };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  const changePassword = async (currentPassword, newPassword) => {
+    try {
+      await api.users.changePassword({ currentPassword, newPassword });
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  };
+
   return (
     <AuthContext.Provider value={{
       currentUser, users, loading,
-      login, logout, createUser, updateUser, deleteUser,
-      reloadUsers: loadUsers,
+      login, logout,
+      createUser, updateUser, deleteUser, reloadUsers: loadUsers,
+      updateProfile, changePassword,
     }}>
       {children}
     </AuthContext.Provider>
