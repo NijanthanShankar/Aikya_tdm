@@ -88,6 +88,13 @@ export function AttendanceProvider({ children }) {
     Promise.all([loadToday(), loadHolidays()]).finally(() => setInitialized(true));
   }, [currentUser?.id]);
 
+  // Poll today's record every 60 s so status stays live
+  useEffect(() => {
+    if (!currentUser) return;
+    const id = setInterval(() => loadToday(), 60_000);
+    return () => clearInterval(id);
+  }, [currentUser?.id]);
+
   const loadToday = async () => {
     if (!currentUser) return;
     setLoadingToday(true);

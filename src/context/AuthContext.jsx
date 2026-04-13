@@ -12,7 +12,8 @@ export function AuthProvider({ children }) {
     api.auth.me()
       .then(({ user }) => {
         setCurrentUser(user);
-        if (user?.role === 'admin') loadUsers();
+        // Both admin and manager need the users list (for task assignment, team view, etc.)
+        if (user?.role === 'admin' || user?.role === 'manager') loadUsers();
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -29,7 +30,7 @@ export function AuthProvider({ children }) {
     try {
       const { user } = await api.auth.login(email, password);
       setCurrentUser(user);
-      if (user.role === 'admin') await loadUsers();
+      if (user.role === 'admin' || user.role === 'manager') await loadUsers();
       return { success: true, user };
     } catch (err) {
       return { success: false, error: err.message };

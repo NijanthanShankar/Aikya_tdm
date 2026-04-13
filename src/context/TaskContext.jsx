@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { api } from '../utils/api';
 import { useAuth } from './AuthContext';
 
@@ -8,19 +8,6 @@ export function TaskProvider({ children }) {
   const { currentUser } = useAuth();
   const [tasks, setTasks]         = useState([]);
   const [loadingTasks, setLoading] = useState(false);
-  const fetchedForRef              = useRef(null);
-
-  // ── Load tasks when user changes ──────────────────────────────
-  useEffect(() => {
-    if (!currentUser) {
-      setTasks([]);
-      fetchedForRef.current = null;
-      return;
-    }
-    if (fetchedForRef.current === currentUser.id) return;
-    fetchedForRef.current = currentUser.id;
-    refreshTasks();
-  }, [currentUser?.id]);
 
   const refreshTasks = useCallback(async (filters = {}) => {
     setLoading(true);
@@ -30,6 +17,22 @@ export function TaskProvider({ children }) {
     } catch {}
     finally { setLoading(false); }
   }, []);
+
+  // ── Load tasks when user logs in / changes ────────────────────
+  useEffect(() => {
+    if (!currentUser) {
+      setTasks([]);
+      return;
+    }
+    refreshTasks();
+  }, [currentUser?.id]);
+
+  // ── Poll every 30 s so the list stays live ─────────────────────
+  useEffect(() => {
+    if (!currentUser) return;
+    const id = setInterval(() => refreshTasks(), 30_000);
+    return () => clearInterval(id);
+  }, [currentUser?.id, refreshTasks]);
 
   // ── Task CRUD ─────────────────────────────────────────────────
   const createTask = useCallback(async (data) => {
