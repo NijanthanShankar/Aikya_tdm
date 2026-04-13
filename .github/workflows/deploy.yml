@@ -25,5 +25,4 @@ jobs:
             **/.git*/**
             **/node_modules/**
             **/.env
-            **/.github/**
-          timeout: 600000
+            **/.github/** 
