@@ -23,7 +23,7 @@ jobs:
       - name: Build React app
         run: npm run build
 
-      - name: Deploy frontend (dist/) to Hostinger
+      - name: Deploy frontend (dist/) to Hostinger — clean slate
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
@@ -31,9 +31,10 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           local-dir: ./dist/
           server-dir: ${{ secrets.FTP_SERVER_DIR }}
+          dangerous-clean-slate: true
           timeout: 60000
 
-      - name: Deploy API (api/) to Hostinger
+      - name: Deploy API (api/) to Hostinger — clean slate
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
@@ -41,4 +42,5 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           local-dir: ./api/
           server-dir: ${{ secrets.FTP_SERVER_DIR }}api/
+          dangerous-clean-slate: true
           timeout: 60000
