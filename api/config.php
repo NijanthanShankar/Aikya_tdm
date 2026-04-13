@@ -1,4 +1,5 @@
 <?php
+date_default_timezone_set('Asia/Kolkata');
 // ─────────────────────────────────────────────────────────────
 //  AgencyHub — Database Configuration
 //  Fill in your Hostinger MySQL credentials below.

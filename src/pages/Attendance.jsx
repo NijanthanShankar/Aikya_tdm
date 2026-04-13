@@ -43,7 +43,8 @@ export default function Attendance() {
     if (isHolidayDate(str)) return { type: 'holiday', label: getHolidayName(str) || 'Holiday' };
     if (recordMap[str])     return { type: recordMap[str].checkoutTime ? 'full' : 'partial', label: recordMap[str].checkoutTime ? `${formatTime(recordMap[str].checkinTime)} – ${formatTime(recordMap[str].checkoutTime)}` : `In: ${formatTime(recordMap[str].checkinTime)}`, hours: recordMap[str].workHours };
     const isPast = d < new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    if (isPast) return { type: 'absent', label: 'Absent' };
+    const isBeforeLaunch = d < new Date(2026, 3, 14); // Launch Date: April 14, 2026
+    if (isPast && !isBeforeLaunch) return { type: 'absent', label: 'Absent' };
     return { type: 'future', label: '' };
   };
 

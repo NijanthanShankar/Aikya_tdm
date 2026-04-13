@@ -13,7 +13,7 @@ require_once 'config.php';
 require_once 'helpers.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
-$db     = getDB();
+$db = getDB();
 $action = $_GET['action'] ?? '';
 
 // ── GET ───────────────────────────────────────────────────────
@@ -49,15 +49,16 @@ if ($method === 'GET') {
     }
 
     // Monthly records
-    $month  = $_GET['month']   ?? date('Y-m');
+    $month = $_GET['month'] ?? date('Y-m');
     $userId = $_GET['user_id'] ?? $user['id'];
 
     // Members can only see own records
-    if ($user['role'] !== 'admin') $userId = $user['id'];
+    if ($user['role'] !== 'admin')
+        $userId = $user['id'];
 
     [$year, $mon] = explode('-', $month . '-01');
     $startDate = "$year-$mon-01";
-    $endDate   = date('Y-m-t', strtotime($startDate));
+    $endDate = date('Y-m-t', strtotime($startDate));
 
     $stmt = $db->prepare("
         SELECT a.*, u.name AS user_name, u.avatar AS user_avatar, u.color AS user_color
@@ -95,11 +96,15 @@ if ($method === 'POST' && $action === 'checkin') {
         respondError('Today is Sunday (Holiday). No attendance required.');
     }
 
-    $lat      = trim($body['lat']      ?? '');
-    $lng      = trim($body['lng']      ?? '');
+    $lat = trim($body['lat'] ?? '');
+    $lng = trim($body['lng'] ?? '');
     $location = trim($body['location'] ?? 'Unknown location');
 
-    $id   = generateId();
+    if (empty($lat) || empty($lng)) {
+        respondError('Location permission and GPS data are required to check in. Please allow location access.');
+    }
+
+    $id = generateId();
     $stmt = $db->prepare("
         INSERT INTO attendance (id, user_id, date, checkin_time, checkin_lat, checkin_lng, checkin_location, status)
         VALUES (?, ?, ?, NOW(), ?, ?, ?, 'present')
@@ -125,12 +130,18 @@ if ($method === 'POST' && $action === 'checkout') {
     $existing->execute([$user['id'], $today]);
     $rec = $existing->fetch();
 
-    if (!$rec) respondError('No check-in record found for today. Please check in first.');
-    if ($rec['checkout_time']) respondError('You have already checked out for today.');
+    if (!$rec)
+        respondError('No check-in record found for today. Please check in first.');
+    if ($rec['checkout_time'])
+        respondError('You have already checked out for today.');
 
-    $lat      = trim($body['lat']      ?? '');
-    $lng      = trim($body['lng']      ?? '');
+    $lat = trim($body['lat'] ?? '');
+    $lng = trim($body['lng'] ?? '');
     $location = trim($body['location'] ?? 'Unknown location');
+
+    if (empty($lat) || empty($lng)) {
+        respondError('Location permission and GPS data are required to check out. Please allow location access.');
+    }
 
     // Calculate work hours
     $stmt = $db->prepare("
@@ -155,26 +166,29 @@ if ($method === 'POST' && $action === 'checkout') {
 // ── PUT: Admin manual adjustment ──────────────────────────────
 if ($method === 'PUT') {
     requireAdmin();
-    $id   = $_GET['id'] ?? '';
+    $id = $_GET['id'] ?? '';
     $body = getBody();
-    if (!$id) respondError('Record ID required.');
+    if (!$id)
+        respondError('Record ID required.');
 
     $check = $db->prepare('SELECT * FROM attendance WHERE id = ?');
     $check->execute([$id]);
     $rec = $check->fetch();
-    if (!$rec) respondError('Record not found.', 404);
+    if (!$rec)
+        respondError('Record not found.', 404);
 
-    $checkinTime  = $body['checkinTime']  ?? $rec['checkin_time'];
+    $checkinTime = $body['checkinTime'] ?? $rec['checkin_time'];
     $checkoutTime = $body['checkoutTime'] ?? $rec['checkout_time'];
-    $status       = $body['status']       ?? $rec['status'];
-    $notes        = $body['notes']        ?? ($rec['notes'] ?? '');
+    $status = $body['status'] ?? $rec['status'];
+    $notes = $body['notes'] ?? ($rec['notes'] ?? '');
 
     // Recalculate hours if both times set
     $workHours = null;
     if ($checkinTime && $checkoutTime) {
         $diff = strtotime($checkoutTime) - strtotime($checkinTime);
         $workHours = round($diff / 3600, 2);
-        if ($workHours < 0) respondError('Checkout time cannot be before check-in time.');
+        if ($workHours < 0)
+            respondError('Checkout time cannot be before check-in time.');
     }
 
     $stmt = $db->prepare("
@@ -193,25 +207,26 @@ if ($method === 'PUT') {
 respondError('Method not allowed.', 405);
 
 // ── Format helper ─────────────────────────────────────────────
-function formatRecord(array $row): array {
+function formatRecord(array $row): array
+{
     return [
-        'id'               => $row['id'],
-        'userId'           => $row['user_id'],
-        'userName'         => $row['user_name']   ?? 'Unknown',
-        'userAvatar'       => $row['user_avatar'] ?? '??',
-        'userColor'        => $row['user_color']  ?? '#7c3aed',
-        'department'       => $row['department']  ?? '',
-        'date'             => $row['date'],
-        'checkinTime'      => $row['checkin_time'],
-        'checkoutTime'     => $row['checkout_time'],
-        'checkinLat'       => $row['checkin_lat'],
-        'checkinLng'       => $row['checkin_lng'],
-        'checkoutLat'      => $row['checkout_lat'],
-        'checkoutLng'      => $row['checkout_lng'],
-        'checkinLocation'  => $row['checkin_location']  ?? '',
+        'id' => $row['id'],
+        'userId' => $row['user_id'],
+        'userName' => $row['user_name'] ?? 'Unknown',
+        'userAvatar' => $row['user_avatar'] ?? '??',
+        'userColor' => $row['user_color'] ?? '#7c3aed',
+        'department' => $row['department'] ?? '',
+        'date' => $row['date'],
+        'checkinTime' => $row['checkin_time'],
+        'checkoutTime' => $row['checkout_time'],
+        'checkinLat' => $row['checkin_lat'],
+        'checkinLng' => $row['checkin_lng'],
+        'checkoutLat' => $row['checkout_lat'],
+        'checkoutLng' => $row['checkout_lng'],
+        'checkinLocation' => $row['checkin_location'] ?? '',
         'checkoutLocation' => $row['checkout_location'] ?? '',
-        'workHours'        => $row['work_hours'] !== null ? (float)$row['work_hours'] : null,
-        'status'           => $row['status'],
-        'notes'            => $row['notes'] ?? '',
+        'workHours' => $row['work_hours'] !== null ? (float) $row['work_hours'] : null,
+        'status' => $row['status'],
+        'notes' => $row['notes'] ?? '',
     ];
 }

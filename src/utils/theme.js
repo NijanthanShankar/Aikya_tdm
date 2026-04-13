@@ -50,15 +50,23 @@ export const ROLE_COLORS = {
 };
 
 export const STATUS_LABELS = {
-  pending:     'Pending',
+  new: 'New',
+  pending: 'Pending',
   in_progress: 'In Progress',
-  completed:   'Completed',
+  completed: 'Completed',
+  need_clarification: 'Need Clarification',
+  pending_requirements: 'Pending Requirements',
+  paused: 'Paused',
 };
 
 export const STATUS_COLORS = {
-  pending:     '#f59e0b',
+  new: '#8b5cf6',
+  pending: '#f59e0b',
   in_progress: '#3b82f6',
-  completed:   '#10b981',
+  completed: '#10b981',
+  need_clarification: '#ec4899',
+  pending_requirements: '#f97316',
+  paused: '#64748b',
 };
 
 export const PRIORITY_LABELS = {

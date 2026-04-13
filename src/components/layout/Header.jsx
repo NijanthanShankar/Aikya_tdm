@@ -98,12 +98,18 @@ function CheckModal({ type, onConfirm, onClose, todayRecord, holidays }) {
             </div>
           )}
 
+          {!fetching && !locationInfo?.lat && (
+            <div style={{ background: T.dangerLight, color: T.danger, padding: '10px 14px', borderRadius: 10, fontSize: 13, marginBottom: 16 }}>
+              ⚠️ Location permission is required. Please enable location access in your browser to check in/out.
+            </div>
+          )}
+
           <div style={{ display: 'flex', gap: 10 }}>
             <button onClick={onClose} style={{ flex: 1, padding: '11px', borderRadius: 12, border: `1.5px solid ${T.border}`, background: 'transparent', cursor: 'pointer', fontWeight: 600, fontSize: 14, color: T.textSecondary }}>Cancel</button>
             <button
               onClick={handleConfirm}
-              disabled={fetching || confirming}
-              style={{ flex: 2, padding: '11px', borderRadius: 12, border: 'none', background: type === 'checkin' ? '#059669' : T.primary, color: '#fff', cursor: fetching || confirming ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: 14, opacity: fetching || confirming ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+              disabled={fetching || confirming || (!fetching && !locationInfo?.lat)}
+              style={{ flex: 2, padding: '11px', borderRadius: 12, border: 'none', background: type === 'checkin' ? '#059669' : T.primary, color: '#fff', cursor: fetching || confirming || (!fetching && !locationInfo?.lat) ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: 14, opacity: fetching || confirming || (!fetching && !locationInfo?.lat) ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
             >
               {confirming ? <><Spinner size={14} color="#fff" /> Processing…</> : type === 'checkin' ? '✅ Confirm Check In' : '✅ Confirm Check Out'}
             </button>

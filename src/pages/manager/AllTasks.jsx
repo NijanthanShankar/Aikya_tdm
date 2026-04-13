@@ -20,14 +20,18 @@ const PRIORITY_OPTIONS = [
 
 const STATUS_OPTIONS = [
   { value: '',            label: 'All Statuses'  },
+  { value: 'new',         label: 'New'           },
   { value: 'pending',     label: 'Pending'       },
   { value: 'in_progress', label: 'In Progress'   },
   { value: 'completed',   label: 'Completed'     },
+  { value: 'need_clarification', label: 'Need Clarification' },
+  { value: 'pending_requirements', label: 'Pending Requirements' },
+  { value: 'paused',      label: 'Paused'        },
 ];
 
 const EMPTY_FORM = {
   title: '', description: '', assignedTo: '', dueDate: '',
-  priority: 'medium', status: 'pending',
+  priority: 'medium', status: 'new',
 };
 
 export default function AllTasks() {
@@ -187,7 +191,11 @@ export default function AllTasks() {
               label="Status"
               value={form.status}
               onChange={upd('status')}
-              options={[{ value: 'pending', label: 'Pending' }, { value: 'in_progress', label: 'In Progress' }, { value: 'completed', label: 'Completed' }]}
+              options={[
+                { value: 'new', label: 'New' },
+                { value: 'pending', label: 'Pending' },
+                { value: 'completed', label: 'Completed' },
+              ]}
             />
           </FormGrid>
 

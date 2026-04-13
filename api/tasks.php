@@ -126,7 +126,7 @@ if ($method === 'POST') {
     if (!$title) respondError('Task title is required.');
 
     $validPriorities = ['low', 'medium', 'high'];
-    $validStatuses   = ['pending', 'in_progress', 'completed'];
+    $validStatuses   = ['new', 'pending', 'in_progress', 'completed', 'need_clarification', 'pending_requirements', 'paused'];
     if (!in_array($priority, $validPriorities, true)) $priority = 'medium';
     if (!in_array($status,   $validStatuses,   true)) $status   = 'pending';
 
@@ -202,7 +202,7 @@ if ($method === 'PUT') {
         if ($existing['assigned_to'] !== $user['id']) respondError('Access denied.', 403);
 
         $status = $body['status'] ?? $existing['status'];
-        $validStatuses = ['pending', 'in_progress', 'completed'];
+        $validStatuses = ['new', 'pending', 'in_progress', 'completed', 'need_clarification', 'pending_requirements', 'paused'];
         if (!in_array($status, $validStatuses, true)) respondError('Invalid status.');
 
         $stmt = $db->prepare('UPDATE tasks SET status=? WHERE id=?');

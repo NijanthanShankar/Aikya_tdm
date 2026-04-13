@@ -12,9 +12,13 @@ import { CheckSquare, Clock, Loader2, CheckCircle2 } from 'lucide-react';
 
 const STATUS_OPTIONS = [
   { value: '',            label: 'All Tasks'   },
+  { value: 'new',         label: 'New'         },
   { value: 'pending',     label: 'Pending'     },
   { value: 'in_progress', label: 'In Progress' },
+  { value: 'need_clarification', label: 'Need Clarification' },
+  { value: 'pending_requirements', label: 'Pending Requirements' },
   { value: 'completed',   label: 'Completed'   },
+  { value: 'paused',      label: 'Paused'      },
 ];
 
 export default function MyTasks() {

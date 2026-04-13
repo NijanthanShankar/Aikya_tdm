@@ -68,9 +68,8 @@ export default function TaskDetail() {
 
   useEffect(() => { if (!loadingTask && task) loadNotes(); }, [loadingTask, task]);
 
-  // ── Mark complete (member) ──────────────────────────────────
-  const handleMarkComplete = async () => {
-    const newStatus = task.status === 'completed' ? 'in_progress' : 'completed';
+  // ── Member status update ──────────────────────────────────
+  const handleStatusChange = async (newStatus) => {
     const result = await updateTask(id, { status: newStatus });
     if (result.success) setTask(result.task);
   };
@@ -262,26 +261,24 @@ export default function TaskDetail() {
                   <p style={{ fontSize: 14, color: T.textSecondary, lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap' }}>{task.description}</p>
                 )}
 
-                {/* Member: Mark complete checkbox */}
+                {/* Member: Update Status */}
                 {!isManager && (
                   <div style={{ marginTop: 18, paddingTop: 18, borderTop: `1px solid ${T.border}` }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-                      <div
-                        onClick={handleMarkComplete}
-                        style={{
-                          width: 22, height: 22, borderRadius: 7, flexShrink: 0,
-                          border: `2px solid ${task.status === 'completed' ? T.success : T.border}`,
-                          background: task.status === 'completed' ? T.success : 'transparent',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          cursor: 'pointer', transition: 'all 0.2s',
-                        }}
-                      >
-                        {task.status === 'completed' && <CheckCircle2 size={14} color="#fff" />}
-                      </div>
-                      <span style={{ fontSize: 14, fontWeight: 600, color: task.status === 'completed' ? T.success : T.textPrimary }}>
-                        {task.status === 'completed' ? '✅ Task Completed' : 'Mark as Completed'}
-                      </span>
-                    </label>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: T.textSecondary, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Update Status</div>
+                    <Select
+                      value={task.status}
+                      onChange={(e) => handleStatusChange(e.target.value)}
+                      options={[
+                        { value: 'new', label: 'New' },
+                        { value: 'pending', label: 'Pending' },
+                        { value: 'in_progress', label: 'In Progress' },
+                        { value: 'need_clarification', label: 'Need Clarification from Member/Manager' },
+                        { value: 'pending_requirements', label: 'Pending Requirements / Prior Details' },
+                        { value: 'paused', label: 'Paused' },
+                        { value: 'completed', label: 'Completed' }
+                      ]}
+                      style={{ maxWidth: 300 }}
+                    />
                   </div>
                 )}
               </Card>
