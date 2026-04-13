@@ -428,7 +428,15 @@ export default function TaskDetail() {
           </FormGrid>
           <FormGrid cols={2}>
             <Select label="Priority" value={editForm.priority || 'medium'} onChange={(e) => setEditForm((p) => ({ ...p, priority: e.target.value }))} options={[{ value: 'high', label: 'High 🔴' }, { value: 'medium', label: 'Medium 🟡' }, { value: 'low', label: 'Low 🟢' }]} />
-            <Select label="Status" value={editForm.status || 'pending'} onChange={(e) => setEditForm((p) => ({ ...p, status: e.target.value }))} options={[{ value: 'pending', label: 'Pending' }, { value: 'in_progress', label: 'In Progress' }, { value: 'completed', label: 'Completed' }]} />
+            <Select label="Status" value={editForm.status || 'new'} onChange={(e) => setEditForm((p) => ({ ...p, status: e.target.value }))} options={[
+              { value: 'new',                  label: 'New' },
+              { value: 'pending',              label: 'Pending' },
+              { value: 'in_progress',          label: 'In Progress' },
+              { value: 'need_clarification',   label: 'Need Clarification' },
+              { value: 'pending_requirements', label: 'Pending Requirements' },
+              { value: 'paused',               label: 'Paused' },
+              { value: 'completed',            label: 'Completed' },
+            ]} />
           </FormGrid>
           {editError && <Alert type="danger">{editError}</Alert>}
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
