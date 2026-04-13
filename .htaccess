@@ -3,4 +3,3 @@ RewriteEngine On
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_URI} !^/api/
 RewriteRule ^ index.html [QSA,L]
-RewriteRule ^\.builds - [F,L]
