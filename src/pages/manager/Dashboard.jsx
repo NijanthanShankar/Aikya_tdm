@@ -124,7 +124,7 @@ export default function Dashboard() {
                 <SectionTitle action={
                   <button
                     onClick={() => navigate('/tasks')}
-                    style={{ fontSize: 13, color: T.primary, fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', padding: '6px 14px', borderRadius: 10, background: T.primaryLight }}
+                    style={{ fontSize: 13, color: T.primary, fontWeight: 600, background: T.primaryLight, border: 'none', cursor: 'pointer', padding: '6px 14px', borderRadius: 10 }}
                   >
                     View all →
                   </button>
