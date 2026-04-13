@@ -106,10 +106,14 @@ export function TaskProvider({ children }) {
   const getTasksByUser   = (userId) => tasks.filter((t) => t.assignedTo === userId);
 
   const getStats = () => ({
-    total:      tasks.length,
-    pending:    tasks.filter((t) => t.status === 'pending').length,
-    inProgress: tasks.filter((t) => t.status === 'in_progress').length,
-    completed:  tasks.filter((t) => t.status === 'completed').length,
+    total:               tasks.length,
+    new:                 tasks.filter((t) => t.status === 'new').length,
+    pending:             tasks.filter((t) => t.status === 'pending').length,
+    inProgress:          tasks.filter((t) => t.status === 'in_progress').length,
+    completed:           tasks.filter((t) => t.status === 'completed').length,
+    needClarification:   tasks.filter((t) => t.status === 'need_clarification').length,
+    pendingRequirements: tasks.filter((t) => t.status === 'pending_requirements').length,
+    paused:              tasks.filter((t) => t.status === 'paused').length,
   });
 
   return (
