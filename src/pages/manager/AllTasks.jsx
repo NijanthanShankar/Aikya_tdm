@@ -192,8 +192,8 @@ export default function AllTasks() {
               value={form.status}
               onChange={upd('status')}
               options={[
-                { value: 'new', label: 'New' },
-                { value: 'pending', label: 'Pending' },
+                { value: 'new',       label: 'New'       },
+                { value: 'pending',   label: 'Pending'   },
                 { value: 'completed', label: 'Completed' },
               ]}
             />

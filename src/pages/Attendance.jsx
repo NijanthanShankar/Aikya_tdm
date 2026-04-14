@@ -38,12 +38,15 @@ export default function Attendance() {
 
   const getDayStatus = (dayNum) => {
     const d   = new Date(year, month, dayNum);
-    const str = d.toISOString().slice(0, 10);
+    // Use local date parts to avoid IST→UTC midnight shift
+    const str = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
     if (d.getDay() === 0)   return { type: 'sunday',  label: 'Sunday' };
     if (isHolidayDate(str)) return { type: 'holiday', label: getHolidayName(str) || 'Holiday' };
     if (recordMap[str])     return { type: recordMap[str].checkoutTime ? 'full' : 'partial', label: recordMap[str].checkoutTime ? `${formatTime(recordMap[str].checkinTime)} – ${formatTime(recordMap[str].checkoutTime)}` : `In: ${formatTime(recordMap[str].checkinTime)}`, hours: recordMap[str].workHours };
-    const isPast = d < new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const isBeforeLaunch = d < new Date(2026, 3, 14); // Launch Date: April 14, 2026
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const launchDate = new Date(2026, 3, 14); // April 14 2026 — attendance tracking starts
+    const isPast = d < today;
+    const isBeforeLaunch = d < launchDate;
     if (isPast && !isBeforeLaunch) return { type: 'absent', label: 'Absent' };
     return { type: 'future', label: '' };
   };

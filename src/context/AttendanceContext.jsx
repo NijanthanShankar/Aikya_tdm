@@ -6,7 +6,9 @@ const AttendanceContext = createContext(null);
 
 // ── Helpers ───────────────────────────────────────────────────
 export function isSundayDate(dateStr) {
-  return new Date(dateStr).getDay() === 0;
+  // Parse as local date to avoid timezone shift
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d).getDay() === 0;
 }
 
 export function isTodaySunday() {
@@ -114,14 +116,15 @@ export function AttendanceProvider({ children }) {
 
   // ── Status helpers ─────────────────────────────────────────
   const isHolidayDate = useCallback((dateStr) => {
-    const d = dateStr ? new Date(dateStr) : new Date();
-    const fmt = d.toISOString().slice(0, 10);
+    // Build local YYYY-MM-DD string to avoid IST→UTC shift
+    const d = dateStr ? (() => { const [y,m,dd] = dateStr.split('-').map(Number); return new Date(y, m-1, dd); })() : new Date();
+    const fmt = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     return holidays.some((h) => h.date === fmt);
   }, [holidays]);
 
   const getHolidayName = useCallback((dateStr) => {
-    const d = dateStr ? new Date(dateStr) : new Date();
-    const fmt = d.toISOString().slice(0, 10);
+    const d = dateStr ? (() => { const [y,m,dd] = dateStr.split('-').map(Number); return new Date(y, m-1, dd); })() : new Date();
+    const fmt = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     return holidays.find((h) => h.date === fmt)?.name || null;
   }, [holidays]);
 
