@@ -10,6 +10,7 @@
 
 require_once 'config.php';
 require_once 'helpers.php';
+require_once 'notify.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 $db     = getDB();
@@ -164,6 +165,21 @@ if ($method === 'POST') {
     $task = $fetch->fetch();
 
     respond(['task' => formatTask($task)], 201);
+
+    // Notify assigned member
+    if ($assignedTo) {
+        $memberRow = $db->prepare('SELECT name, email, phone FROM users WHERE id = ?');
+        $memberRow->execute([$assignedTo]);
+        $member = $memberRow->fetch();
+        if ($member) {
+            notifyTaskAssigned([
+                'title'       => $title,
+                'priority'    => $priority,
+                'description' => $description,
+                'due_date'    => $dueDate,
+            ], $member);
+        }
+    }
 }
 
 // ── PUT — update task ──────────────────────────────────────────
@@ -207,6 +223,13 @@ if ($method === 'PUT') {
 
         $stmt = $db->prepare('UPDATE tasks SET status=? WHERE id=?');
         $stmt->execute([$status, $id]);
+
+        // Notify manager of status change
+        if ($status !== $existing['status']) {
+            $taskTitle = $existing['title'];
+            $memberInfo = ['name' => $user['name'], 'phone' => $user['phone'] ?? '', 'email' => $user['email'] ?? ''];
+            notifyStatusChanged(['title' => $taskTitle], $memberInfo, $existing['status'], $status);
+        }
     }
 
     // Fetch updated task

@@ -8,6 +8,7 @@
 
 require_once 'config.php';
 require_once 'helpers.php';
+require_once 'notify.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 $db     = getDB();
@@ -105,6 +106,19 @@ if ($method === 'POST') {
     $note = $fetch->fetch();
 
     respond(['note' => formatNote($note)], 201);
+
+    // Notify manager if note added by a member
+    if ($user['role'] !== 'admin' && $noteText) {
+        try {
+            $taskFull = $db->prepare('SELECT title FROM tasks WHERE id = ?');
+            $taskFull->execute([$taskId]);
+            $taskRow = $taskFull->fetch();
+            if ($taskRow) {
+                $memberInfo = ['name' => $user['name'], 'phone' => $user['phone'] ?? '', 'email' => $user['email'] ?? ''];
+                notifyNoteAdded(['title' => $taskRow['title']], $memberInfo, $noteText);
+            }
+        } catch (\Exception $e) { /* silent fail */ }
+    }
 }
 
 // ── DELETE — remove note ──────────────────────────────────────

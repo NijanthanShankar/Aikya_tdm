@@ -13,8 +13,18 @@ import {
 } from '../components/ui';
 import {
   ArrowLeft, Plus, Paperclip, Send, Pencil, Trash2, CheckCircle2,
-  MessageSquare, Calendar, User, Tag,
+  MessageSquare, Calendar, User, Tag, AlertTriangle,
 } from 'lucide-react';
+
+const STATUS_META = {
+  new:                  { label: 'New',                  emoji: '🆕', bg: '#ede9fe', color: '#7c3aed' },
+  pending:              { label: 'Pending',              emoji: '⏳', bg: '#fef3c7', color: '#d97706' },
+  in_progress:          { label: 'In Progress',          emoji: '🔵', bg: '#dbeafe', color: '#2563eb' },
+  need_clarification:   { label: 'Need Clarification',   emoji: '❓', bg: '#fce7f3', color: '#db2777' },
+  pending_requirements: { label: 'Pending Requirements', emoji: '📋', bg: '#ffedd5', color: '#ea580c' },
+  paused:               { label: 'Paused',               emoji: '⏸️', bg: '#f1f5f9', color: '#64748b' },
+  completed:            { label: 'Completed',            emoji: '✅', bg: '#dcfce7', color: '#16a34a' },
+};
 
 export default function TaskDetail() {
   const { id } = useParams();
@@ -38,6 +48,10 @@ export default function TaskDetail() {
   const [submitting,   setSubmitting]   = useState(false);
   const [noteError,    setNoteError]    = useState('');
   const fileInputRef = useRef(null);
+
+  // Status confirmation popup
+  const [pendingStatus, setPendingStatus] = useState(null); // { from, to }
+  const [statusSaving,  setStatusSaving]  = useState(false);
 
   // Edit task modal
   const [editOpen,    setEditOpen]    = useState(false);
@@ -68,10 +82,21 @@ export default function TaskDetail() {
 
   useEffect(() => { if (!loadingTask && task) loadNotes(); }, [loadingTask, task]);
 
-  // ── Member status update ──────────────────────────────────
-  const handleStatusChange = async (newStatus) => {
-    const result = await updateTask(id, { status: newStatus });
-    if (result.success) setTask(result.task);
+  // ── Member status update (two-step confirm) ──────────────────
+  const requestStatusChange = (newStatus) => {
+    if (newStatus === task.status) return;
+    setPendingStatus({ from: task.status, to: newStatus });
+  };
+
+  const confirmStatusChange = async () => {
+    if (!pendingStatus) return;
+    setStatusSaving(true);
+    const result = await updateTask(id, { status: pendingStatus.to });
+    setStatusSaving(false);
+    if (result.success) {
+      setTask(result.task);
+      setPendingStatus(null);
+    }
   };
 
   // ── File picker ─────────────────────────────────────────────
@@ -261,24 +286,25 @@ export default function TaskDetail() {
                   <p style={{ fontSize: 14, color: T.textSecondary, lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap' }}>{task.description}</p>
                 )}
 
-                {/* Member: Update Status */}
+                 {/* Member: Update Status */}
                 {!isManager && (
                   <div style={{ marginTop: 18, paddingTop: 18, borderTop: `1px solid ${T.border}` }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: T.textSecondary, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Update Status</div>
                     <Select
                       value={task.status}
-                      onChange={(e) => handleStatusChange(e.target.value)}
+                      onChange={(e) => requestStatusChange(e.target.value)}
                       options={[
-                        { value: 'new', label: 'New' },
-                        { value: 'pending', label: 'Pending' },
-                        { value: 'in_progress', label: 'In Progress' },
-                        { value: 'need_clarification', label: 'Need Clarification from Member/Manager' },
-                        { value: 'pending_requirements', label: 'Pending Requirements / Prior Details' },
-                        { value: 'paused', label: 'Paused' },
-                        { value: 'completed', label: 'Completed' }
+                        { value: 'new',                  label: '🆕 New' },
+                        { value: 'pending',              label: '⏳ Pending' },
+                        { value: 'in_progress',          label: '🔵 In Progress' },
+                        { value: 'need_clarification',   label: '❓ Need Clarification' },
+                        { value: 'pending_requirements', label: '📋 Pending Requirements' },
+                        { value: 'paused',               label: '⏸️ Paused' },
+                        { value: 'completed',            label: '✅ Completed' },
                       ]}
                       style={{ maxWidth: 300 }}
                     />
+                    <div style={{ fontSize: 12, color: T.textMuted, marginTop: 6 }}>Selecting a status will show a confirmation before saving.</div>
                   </div>
                 )}
               </Card>
@@ -445,6 +471,65 @@ export default function TaskDetail() {
           </div>
         </form>
       </Modal>
+      {/* ── Status Confirmation Popup ──────────────────── */}
+      {pendingStatus && (() => {
+        const from = STATUS_META[pendingStatus.from] || { label: pendingStatus.from, emoji: '•', bg: '#f3f4f6', color: '#6b7280' };
+        const to   = STATUS_META[pendingStatus.to]   || { label: pendingStatus.to,   emoji: '•', bg: '#f3f4f6', color: '#6b7280' };
+        return (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(15,10,30,0.55)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+            <div style={{ background: '#fff', borderRadius: 24, width: '100%', maxWidth: 420, boxShadow: '0 32px 80px rgba(124,58,237,0.22)', border: `1.5px solid ${T.border}`, overflow: 'hidden', animation: 'popIn 0.22s cubic-bezier(0.34,1.56,0.64,1)' }}>
+              <style>{`@keyframes popIn{from{opacity:0;transform:scale(0.88)}to{opacity:1;transform:scale(1)}}`}</style>
+
+              {/* Header */}
+              <div style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)', padding: '24px 28px', color: '#fff', textAlign: 'center' }}>
+                <div style={{ fontSize: 36, marginBottom: 8 }}>🔄</div>
+                <div style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: 20 }}>Confirm Status Change</div>
+                <div style={{ fontSize: 13, opacity: 0.82, marginTop: 4 }}>Please review before saving</div>
+              </div>
+
+              {/* Body */}
+              <div style={{ padding: '28px 28px 24px' }}>
+                {/* From → To visualization */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+                  <div style={{ flex: 1, background: from.bg, borderRadius: 14, padding: '14px 16px', textAlign: 'center', border: `1.5px solid ${from.color}30` }}>
+                    <div style={{ fontSize: 22 }}>{from.emoji}</div>
+                    <div style={{ fontSize: 12, color: from.color, fontWeight: 700, marginTop: 4 }}>{from.label}</div>
+                    <div style={{ fontSize: 10, color: T.textMuted, marginTop: 2 }}>Current</div>
+                  </div>
+                  <div style={{ fontSize: 22, color: T.textMuted, flexShrink: 0 }}>→</div>
+                  <div style={{ flex: 1, background: to.bg, borderRadius: 14, padding: '14px 16px', textAlign: 'center', border: `2px solid ${to.color}` }}>
+                    <div style={{ fontSize: 22 }}>{to.emoji}</div>
+                    <div style={{ fontSize: 12, color: to.color, fontWeight: 700, marginTop: 4 }}>{to.label}</div>
+                    <div style={{ fontSize: 10, color: T.textMuted, marginTop: 2 }}>New Status</div>
+                  </div>
+                </div>
+
+                <p style={{ fontSize: 13, color: T.textSecondary, margin: '0 0 20px', textAlign: 'center', lineHeight: 1.6 }}>
+                  This will update the task status and notify your manager. Are you sure?
+                </p>
+
+                {/* Actions */}
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button
+                    onClick={() => setPendingStatus(null)}
+                    disabled={statusSaving}
+                    style={{ flex: 1, padding: '12px', borderRadius: 12, border: `1.5px solid ${T.border}`, background: 'transparent', cursor: 'pointer', fontWeight: 600, fontSize: 14, color: T.textSecondary, transition: 'background 0.15s' }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmStatusChange}
+                    disabled={statusSaving}
+                    style={{ flex: 2, padding: '12px', borderRadius: 12, border: 'none', background: `linear-gradient(135deg, ${to.color}, ${to.color}cc)`, color: '#fff', cursor: statusSaving ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: statusSaving ? 0.75 : 1, boxShadow: `0 4px 14px ${to.color}44` }}
+                  >
+                    {statusSaving ? <><span style={{ width: 14, height: 14, border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite', display: 'inline-block' }} /><style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style> Saving…</> : `✓ Confirm — ${to.label}`}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

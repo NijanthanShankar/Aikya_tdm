@@ -11,6 +11,7 @@
 
 require_once 'config.php';
 require_once 'helpers.php';
+require_once 'notify.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 $db = getDB();
@@ -117,7 +118,15 @@ if ($method === 'POST' && $action === 'checkin') {
         FROM attendance a JOIN users u ON a.user_id = u.id WHERE a.id = ?
     ");
     $fetch->execute([$id]);
-    respond(['record' => formatRecord($fetch->fetch())]);
+    $record = formatRecord($fetch->fetch());
+
+    // Notify manager of check-in (async — don't fail if notification fails)
+    try {
+        $timeStr = date('h:i A');
+        notifyCheckin(['name' => $user['name']], $timeStr, $location);
+    } catch (\Exception $e) { /* silent fail */ }
+
+    respond(['record' => $record]);
 }
 
 // ── POST: Check Out ────────────────────────────────────────────

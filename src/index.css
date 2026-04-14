@@ -1,0 +1,115 @@
+/* ─────────────────────────────────────────────────────────────
+   Aikya Task Portal — Global Mobile Responsive Styles
+   ───────────────────────────────────────────────────────────── */
+
+/* ── Layout shell ───────────────────────────────────────────── */
+.aikya-layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.aikya-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+/* ── Tables → horizontal scroll on mobile ───────────────────── */
+.aikya-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── Card grids → single column on mobile ───────────────────── */
+.aikya-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 14px;
+}
+
+/* ── Form grids ─────────────────────────────────────────────── */
+.aikya-form-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+/* ── ≤ 768px (tablets & phones) ─────────────────────────────── */
+@media (max-width: 768px) {
+  /* Sidebar hidden; hamburger shown */
+  .aikya-sidebar-desktop { display: none !important; }
+  .aikya-hamburger        { display: flex !important; }
+
+  /* Push main content down so hamburger doesn't overlap header */
+  .aikya-main > header {
+    padding-left: 64px !important;
+  }
+
+  /* Header: wrap on small screens */
+  .aikya-header-inner {
+    flex-wrap: wrap;
+    gap: 8px !important;
+    padding: 10px 16px !important;
+  }
+
+  .aikya-header-clock   { display: none; }    /* hide clock on tiny screens */
+  .aikya-header-actions { justify-content: flex-end; }
+
+  /* Stat grids → 2 columns */
+  .aikya-stat-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+
+  /* Form grids → 1 column */
+  .aikya-form-grid-2 { grid-template-columns: 1fr; }
+
+  /* Modals → full width */
+  .aikya-modal-inner {
+    max-width: 100% !important;
+    margin: 0 !important;
+    border-radius: 20px 20px 0 0 !important;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+  }
+
+  /* Task cards → full width */
+  .aikya-task-card { width: 100% !important; }
+
+  /* Page padding */
+  .aikya-page { padding: 16px !important; }
+
+  /* Attendance calendar cells — smaller */
+  .aikya-cal-cell { min-height: 52px !important; padding: 4px 2px !important; }
+
+  /* Text size adjustments */
+  .aikya-page-title { font-size: 16px !important; }
+
+  /* Filters wrap */
+  .aikya-filter-bar { flex-wrap: wrap !important; }
+
+  /* Button row wrap */
+  .aikya-btn-row { flex-wrap: wrap; gap: 8px; }
+}
+
+/* ── ≤ 480px (small phones) ─────────────────────────────────── */
+@media (max-width: 480px) {
+  .aikya-stat-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+
+  .aikya-header-inner { padding: 8px 12px 8px 60px !important; }
+
+  /* Hide secondary text in status badge on very small screens */
+  .aikya-status-badge-sub { display: none !important; }
+
+  /* Note composer full width */
+  .aikya-note-composer { padding: 12px !important; }
+}
+
+/* ── Smooth transitions everywhere ──────────────────────────── */
+button, a, input, select, textarea {
+  transition: opacity 0.15s, background 0.15s;
+}
+
+/* ── Prevent horizontal scroll ──────────────────────────────── */
+html, body { overflow-x: hidden; max-width: 100vw; }
