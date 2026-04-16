@@ -97,5 +97,22 @@ export const api = {
     add:    (data)   => request('/holidays.php', { method: 'POST',   body: JSON.stringify(data) }),
     remove: (id)     => request(`/holidays.php?id=${id}`, { method: 'DELETE' }),
   },
+
+  // ── Leave Management ──────────────────────────────────────────
+  leave: {
+    list:    (year)      => request(`/leave.php?year=${year}`),
+    listAll: (params={}) => {
+      const qs = new URLSearchParams({ action: 'all', ...params }).toString();
+      return request(`/leave.php?${qs}`);
+    },
+    balance: (year, userId) => {
+      const p = { action: 'balance', year };
+      if (userId) p.user_id = userId;
+      return request(`/leave.php?${new URLSearchParams(p).toString()}`);
+    },
+    apply:  (data)      => request('/leave.php', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id, data)  => request(`/leave.php?id=${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    remove: (id)        => request(`/leave.php?id=${id}`, { method: 'DELETE' }),
+  },
 };
 

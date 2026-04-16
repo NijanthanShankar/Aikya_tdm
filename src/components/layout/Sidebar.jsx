@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { T, ROLE_LABELS, ROLE_COLORS } from '../../utils/theme';
 import {
   LayoutDashboard, CheckSquare, Users, User, LogOut,
-  ChevronLeft, ChevronRight, ClipboardList, CalendarCheck, Menu, X,
+  ChevronLeft, ChevronRight, ClipboardList, CalendarCheck, CalendarOff, Menu, X,
 } from 'lucide-react';
 import { AvatarCircle } from '../ui';
 
@@ -14,12 +14,14 @@ const NAV = {
     { path: '/tasks',              icon: ClipboardList,   label: 'All Tasks'   },
     { path: '/team',               icon: Users,           label: 'Team'        },
     { path: '/attendance-admin',   icon: CalendarCheck,   label: 'Attendance'  },
+    { path: '/leave-admin',        icon: CalendarOff,     label: 'Leave Mgmt'  },
     { path: '/profile',            icon: User,            label: 'My Profile'  },
   ],
   member: [
     { path: '/my-tasks',   icon: CheckSquare,   label: 'My Tasks'   },
-    { path: '/attendance', icon: CalendarCheck, label: 'Attendance' },
-    { path: '/profile',    icon: User,          label: 'My Profile' },
+    { path: '/attendance', icon: CalendarCheck,  label: 'Attendance' },
+    { path: '/leave',      icon: CalendarOff,    label: 'Leave'      },
+    { path: '/profile',    icon: User,           label: 'My Profile' },
   ],
 };
 

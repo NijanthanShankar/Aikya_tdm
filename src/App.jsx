@@ -7,10 +7,12 @@ import Dashboard      from './pages/manager/Dashboard';
 import AllTasks       from './pages/manager/AllTasks';
 import Team           from './pages/manager/Team';
 import AttendanceAdmin from './pages/manager/AttendanceAdmin';
+import LeaveAdmin     from './pages/manager/LeaveAdmin';
 import MyTasks        from './pages/member/MyTasks';
 import TaskDetail     from './pages/TaskDetail';
 import Profile        from './pages/Profile';
 import Attendance     from './pages/Attendance';
+import Leave          from './pages/Leave';
 
 // ── Loading splash ─────────────────────────────────────────────
 function LoadingScreen() {
@@ -64,10 +66,12 @@ export default function App() {
       <Route path="/tasks"       element={<RequireAdmin><AllTasks /></RequireAdmin>} />
       <Route path="/team"        element={<RequireAdmin><Team /></RequireAdmin>} />
       <Route path="/attendance-admin" element={<RequireAdmin><AttendanceAdmin /></RequireAdmin>} />
+      <Route path="/leave-admin"      element={<RequireAdmin><LeaveAdmin /></RequireAdmin>} />
 
       {/* Member routes */}
       <Route path="/my-tasks"    element={<RequireAuth><MyTasks /></RequireAuth>} />
       <Route path="/attendance"  element={<RequireAuth><Attendance /></RequireAuth>} />
+      <Route path="/leave"       element={<RequireAuth><Leave /></RequireAuth>} />
 
       {/* Shared */}
       <Route path="/tasks/:id"   element={<RequireAuth><TaskDetail /></RequireAuth>} />

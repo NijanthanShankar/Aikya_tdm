@@ -140,7 +140,29 @@ $db->exec("
 ");
 echo "✅ Table 'holidays' ready.\n";
 
-// ── Step 9: Show current users ─────────────────────────────────
+// ── Step 9: Create leaves table ───────────────────────────────
+$db->exec("
+    CREATE TABLE IF NOT EXISTS leaves (
+        id            VARCHAR(32)   PRIMARY KEY,
+        user_id       VARCHAR(32)   NOT NULL,
+        leave_type    VARCHAR(20)   NOT NULL DEFAULT 'casual',
+        from_date     DATE          NOT NULL,
+        to_date       DATE          NOT NULL,
+        num_days      DECIMAL(4,1)  NOT NULL DEFAULT 1,
+        reason        TEXT          NOT NULL,
+        status        VARCHAR(20)   NOT NULL DEFAULT 'pending',
+        approved_by   VARCHAR(32)   DEFAULT NULL,
+        admin_note    TEXT          DEFAULT NULL,
+        created_at    DATETIME      DEFAULT CURRENT_TIMESTAMP,
+        updated_at    DATETIME      DEFAULT NULL,
+        INDEX idx_user     (user_id),
+        INDEX idx_status   (status),
+        INDEX idx_dates    (from_date, to_date)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+");
+echo "✅ Table 'leaves' ready.\n";
+
+// ── Step 10: Show current users ─────────────────────────────────
 echo "\n── Current Users ──────────────────────────────\n";
 $users = $db->query("SELECT id, name, email, role, color FROM users ORDER BY role, name")->fetchAll(PDO::FETCH_ASSOC);
 if (empty($users)) {
