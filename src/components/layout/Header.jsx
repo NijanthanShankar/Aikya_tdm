@@ -68,7 +68,12 @@ function CheckModal({ type, onConfirm, onClose, todayRecord, holidays }) {
               <div style={{ fontSize: 12, color: T.textMuted }}>Checked in at</div>
               <div style={{ fontWeight: 700, color: T.textPrimary, fontSize: 15 }}>{formatTime(todayRecord.checkinTime)}</div>
               <div style={{ fontSize: 12, color: T.textMuted, marginTop: 4 }}>Duration so far: {(() => {
-                const diff = Math.round((Date.now() - new Date(todayRecord.checkinTime)) / 60000);
+                // Parse IST time manually — new Date(string) may treat it as UTC
+                const [dp, tp] = todayRecord.checkinTime.split(/[T ]/);
+                const [y, mo, d] = dp.split('-').map(Number);
+                const [h, mi, s] = (tp || '00:00:00').split(':').map(Number);
+                const checkinLocal = new Date(y, mo - 1, d, h, mi, s || 0);
+                const diff = Math.round((Date.now() - checkinLocal.getTime()) / 60000);
                 return `${Math.floor(diff / 60)}h ${diff % 60}m`;
               })()}</div>
             </div>

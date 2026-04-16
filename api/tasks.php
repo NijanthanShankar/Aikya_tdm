@@ -164,22 +164,24 @@ if ($method === 'POST') {
     $fetch->execute([$id]);
     $task = $fetch->fetch();
 
-    respond(['task' => formatTask($task)], 201);
-
-    // Notify assigned member
+    // Notify assigned member BEFORE respond (respond calls exit)
     if ($assignedTo) {
-        $memberRow = $db->prepare('SELECT name, email, phone FROM users WHERE id = ?');
-        $memberRow->execute([$assignedTo]);
-        $member = $memberRow->fetch();
-        if ($member) {
-            notifyTaskAssigned([
-                'title'       => $title,
-                'priority'    => $priority,
-                'description' => $description,
-                'due_date'    => $dueDate,
-            ], $member);
-        }
+        try {
+            $memberRow = $db->prepare('SELECT name, email, phone FROM users WHERE id = ?');
+            $memberRow->execute([$assignedTo]);
+            $member = $memberRow->fetch();
+            if ($member) {
+                notifyTaskAssigned([
+                    'title'       => $title,
+                    'priority'    => $priority,
+                    'description' => $description,
+                    'due_date'    => $dueDate,
+                ], $member);
+            }
+        } catch (\Exception $e) { /* silent fail — don't block response */ }
     }
+
+    respond(['task' => formatTask($task)], 201);
 }
 
 // ── PUT — update task ──────────────────────────────────────────

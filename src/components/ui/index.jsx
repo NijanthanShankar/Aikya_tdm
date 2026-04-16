@@ -293,7 +293,16 @@ export function TaskCard({ task, onClick }) {
 
 // ── NoteItem ──────────────────────────────────────────────────────────────────
 export function NoteItem({ note, onDelete, canDelete }) {
-  const date = new Date(note.createdAt);
+  // Parse server datetime as local time (IST) — avoid UTC shift
+  const parseLocal = (str) => {
+    if (!str) return new Date();
+    const [dp, tp] = str.split(/[T ]/);
+    if (!tp) return new Date(str);
+    const [y, mo, d] = dp.split('-').map(Number);
+    const [h, mi, s] = tp.split(':').map(Number);
+    return new Date(y, mo - 1, d, h, mi, s || 0);
+  };
+  const date = parseLocal(note.createdAt);
   const formattedDate = date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
   const formattedTime = date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 

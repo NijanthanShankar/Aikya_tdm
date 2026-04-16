@@ -92,8 +92,9 @@ if ($method === 'POST') {
         json_encode($cleanAttachments),
     ]);
 
-    // Update task's updated_at
-    $db->prepare('UPDATE tasks SET updated_at = NOW() WHERE id = ?')->execute([$taskId]);
+    // Update task's updated_at (use PHP IST time, not MySQL NOW())
+    $istNow = date('Y-m-d H:i:s');
+    $db->prepare('UPDATE tasks SET updated_at = ? WHERE id = ?')->execute([$istNow, $taskId]);
 
     // Fetch back
     $fetch = $db->prepare("
@@ -105,9 +106,7 @@ if ($method === 'POST') {
     $fetch->execute([$id]);
     $note = $fetch->fetch();
 
-    respond(['note' => formatNote($note)], 201);
-
-    // Notify manager if note added by a member
+    // Notify manager if note added by a member — BEFORE respond (respond calls exit)
     if ($user['role'] !== 'admin' && $noteText) {
         try {
             $taskFull = $db->prepare('SELECT title FROM tasks WHERE id = ?');
@@ -119,6 +118,8 @@ if ($method === 'POST') {
             }
         } catch (\Exception $e) { /* silent fail */ }
     }
+
+    respond(['note' => formatNote($note)], 201);
 }
 
 // ── DELETE — remove note ──────────────────────────────────────

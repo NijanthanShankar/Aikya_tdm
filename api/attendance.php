@@ -17,6 +17,10 @@ $method = $_SERVER['REQUEST_METHOD'];
 $db = getDB();
 $action = $_GET['action'] ?? '';
 
+// ── IST time constants ────────────────────────────────────────
+$IST_DATE = date('Y-m-d');              // IST date guaranteed by PHP timezone
+$IST_NOW  = date('Y-m-d H:i:s');       // IST datetime guaranteed by PHP timezone
+
 // ── GET ───────────────────────────────────────────────────────
 if ($method === 'GET') {
     $user = requireMember();
@@ -27,9 +31,9 @@ if ($method === 'GET') {
             SELECT a.*, u.name AS user_name, u.avatar AS user_avatar, u.color AS user_color
             FROM attendance a
             JOIN users u ON a.user_id = u.id
-            WHERE a.user_id = ? AND a.date = CURDATE()
+            WHERE a.user_id = ? AND a.date = ?
         ");
-        $stmt->execute([$user['id']]);
+        $stmt->execute([$user['id'], $IST_DATE]);
         $row = $stmt->fetch();
         respond(['record' => $row ? formatRecord($row) : null]);
     }
@@ -41,10 +45,10 @@ if ($method === 'GET') {
             SELECT a.*, u.name AS user_name, u.avatar AS user_avatar, u.color AS user_color, u.department
             FROM attendance a
             JOIN users u ON a.user_id = u.id
-            WHERE a.date = CURDATE()
+            WHERE a.date = ?
             ORDER BY a.checkin_time ASC
         ");
-        $stmt->execute();
+        $stmt->execute([$IST_DATE]);
         $rows = $stmt->fetchAll();
         respond(['records' => array_map('formatRecord', $rows)]);
     }
@@ -77,11 +81,10 @@ if ($method === 'GET') {
 if ($method === 'POST' && $action === 'checkin') {
     $user = requireMember();
     $body = getBody();
-    $today = date('Y-m-d');
 
     // Check if already checked in today
     $existing = $db->prepare('SELECT id, checkout_time FROM attendance WHERE user_id = ? AND date = ?');
-    $existing->execute([$user['id'], $today]);
+    $existing->execute([$user['id'], $IST_DATE]);
     $rec = $existing->fetch();
 
     if ($rec) {
@@ -108,9 +111,9 @@ if ($method === 'POST' && $action === 'checkin') {
     $id = generateId();
     $stmt = $db->prepare("
         INSERT INTO attendance (id, user_id, date, checkin_time, checkin_lat, checkin_lng, checkin_location, status)
-        VALUES (?, ?, ?, NOW(), ?, ?, ?, 'present')
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'present')
     ");
-    $stmt->execute([$id, $user['id'], $today, $lat ?: null, $lng ?: null, $location]);
+    $stmt->execute([$id, $user['id'], $IST_DATE, $IST_NOW, $lat ?: null, $lng ?: null, $location]);
 
     // Fetch back
     $fetch = $db->prepare("
@@ -133,10 +136,9 @@ if ($method === 'POST' && $action === 'checkin') {
 if ($method === 'POST' && $action === 'checkout') {
     $user = requireMember();
     $body = getBody();
-    $today = date('Y-m-d');
 
     $existing = $db->prepare('SELECT * FROM attendance WHERE user_id = ? AND date = ?');
-    $existing->execute([$user['id'], $today]);
+    $existing->execute([$user['id'], $IST_DATE]);
     $rec = $existing->fetch();
 
     if (!$rec)
@@ -152,17 +154,20 @@ if ($method === 'POST' && $action === 'checkout') {
         respondError('Location permission and GPS data are required to check out. Please allow location access.');
     }
 
-    // Calculate work hours
+    // Calculate work hours using PHP IST time
+    $checkoutNow = date('Y-m-d H:i:s'); // fresh IST timestamp for checkout
+    $workHours = round((strtotime($checkoutNow) - strtotime($rec['checkin_time'])) / 3600, 2);
+
     $stmt = $db->prepare("
         UPDATE attendance
-        SET checkout_time     = NOW(),
+        SET checkout_time     = ?,
             checkout_lat      = ?,
             checkout_lng      = ?,
             checkout_location = ?,
-            work_hours        = ROUND(TIMESTAMPDIFF(SECOND, checkin_time, NOW()) / 3600, 2)
+            work_hours        = ?
         WHERE id = ?
     ");
-    $stmt->execute([$lat ?: null, $lng ?: null, $location, $rec['id']]);
+    $stmt->execute([$checkoutNow, $lat ?: null, $lng ?: null, $location, $workHours, $rec['id']]);
 
     $fetch = $db->prepare("
         SELECT a.*, u.name AS user_name, u.avatar AS user_avatar, u.color AS user_color

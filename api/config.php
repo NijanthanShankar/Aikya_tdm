@@ -31,6 +31,8 @@ function getDB(): PDO {
 
     try {
         $pdo = new PDO($dsn, DB_USER, DB_PASS, $options);
+        // Force MySQL session to IST so NOW(), CURDATE(), CURRENT_TIMESTAMP return Indian time
+        $pdo->exec("SET time_zone = '+05:30'");
     } catch (PDOException $e) {
         http_response_code(500);
         die(json_encode(['error' => 'Database connection failed: ' . $e->getMessage()]));
