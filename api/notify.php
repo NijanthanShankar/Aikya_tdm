@@ -19,22 +19,22 @@
 // 4. Create an App Password (select "Mail" → "Other" → name it "Aikya Portal")
 // 5. Copy the 16-character password and paste it below
 // ─────────────────────────────────────────────────────────────
-define('SMTP_HOST',     'smtp.gmail.com');         // Gmail SMTP
-define('SMTP_PORT',     465);                       // SSL port
-define('SMTP_USER',     '');                        // your-gmail@gmail.com
-define('SMTP_PASS',     '');                        // 16-char App Password (NOT your Gmail password)
-define('SMTP_FROM',     '');                        // same as SMTP_USER
-define('SMTP_FROM_NAME','Aikya Task Portal');
+define('SMTP_HOST', 'smtp.gmail.com');         // Gmail SMTP
+define('SMTP_PORT', 465);                       // SSL port
+define('SMTP_USER', 'nijanthan1952@gmail.com');                        // your-gmail@gmail.com
+define('SMTP_PASS', 'jxoa xvta oerg qpzm');                        // 16-char App Password (NOT your Gmail password)
+define('SMTP_FROM', 'nijanthan1952@gmail.com');                        // same as SMTP_USER
+define('SMTP_FROM_NAME', 'Aikya Task Portal');
 
 // ── WhatsApp Config (choose ONE provider) ─────────────────────
 // Option A: UltraMsg (recommended — easy, cheap)
 define('ULTRAMSG_INSTANCE', '');                  // e.g. instance12345
-define('ULTRAMSG_TOKEN',    '');                  // API token from ultramsg.com
+define('ULTRAMSG_TOKEN', '');                  // API token from ultramsg.com
 
 // Option B: Twilio
-define('TWILIO_SID',   '');
+define('TWILIO_SID', '');
 define('TWILIO_TOKEN', '');
-define('TWILIO_FROM',  'whatsapp:+14155238886');  // Twilio sandbox number
+define('TWILIO_FROM', 'whatsapp:+14155238886');  // Twilio sandbox number
 
 // ── Active provider: 'ultramsg' | 'twilio' | 'none' ──────────
 define('WHATSAPP_PROVIDER', 'ultramsg');
@@ -46,25 +46,28 @@ define('MANAGER_WHATSAPP', '');                   // e.g. 919876543210
 // ─────────────────────────────────────────────────────────────
 //  Send WhatsApp message
 // ─────────────────────────────────────────────────────────────
-function sendWhatsApp(string $to, string $message): bool {
-    if (!$to || WHATSAPP_PROVIDER === 'none') return false;
+function sendWhatsApp(string $to, string $message): bool
+{
+    if (!$to || WHATSAPP_PROVIDER === 'none')
+        return false;
     // Ensure number has no + prefix
     $to = ltrim($to, '+');
 
     if (WHATSAPP_PROVIDER === 'ultramsg') {
-        if (!ULTRAMSG_INSTANCE || !ULTRAMSG_TOKEN) return false;
-        $url  = "https://api.ultramsg.com/" . ULTRAMSG_INSTANCE . "/messages/chat";
+        if (!ULTRAMSG_INSTANCE || !ULTRAMSG_TOKEN)
+            return false;
+        $url = "https://api.ultramsg.com/" . ULTRAMSG_INSTANCE . "/messages/chat";
         $data = http_build_query([
-            'token'  => ULTRAMSG_TOKEN,
-            'to'     => $to,
-            'body'   => $message,
+            'token' => ULTRAMSG_TOKEN,
+            'to' => $to,
+            'body' => $message,
         ]);
         $ch = curl_init($url);
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => $data,
-            CURLOPT_TIMEOUT        => 10,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $data,
+            CURLOPT_TIMEOUT => 10,
         ]);
         $res = curl_exec($ch);
         curl_close($ch);
@@ -73,20 +76,21 @@ function sendWhatsApp(string $to, string $message): bool {
     }
 
     if (WHATSAPP_PROVIDER === 'twilio') {
-        if (!TWILIO_SID || !TWILIO_TOKEN) return false;
-        $url  = "https://api.twilio.com/2010-04-01/Accounts/" . TWILIO_SID . "/Messages.json";
+        if (!TWILIO_SID || !TWILIO_TOKEN)
+            return false;
+        $url = "https://api.twilio.com/2010-04-01/Accounts/" . TWILIO_SID . "/Messages.json";
         $data = http_build_query([
             'From' => TWILIO_FROM,
-            'To'   => "whatsapp:+$to",
+            'To' => "whatsapp:+$to",
             'Body' => $message,
         ]);
         $ch = curl_init($url);
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => $data,
-            CURLOPT_USERPWD        => TWILIO_SID . ':' . TWILIO_TOKEN,
-            CURLOPT_TIMEOUT        => 10,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $data,
+            CURLOPT_USERPWD => TWILIO_SID . ':' . TWILIO_TOKEN,
+            CURLOPT_TIMEOUT => 10,
         ]);
         $res = curl_exec($ch);
         curl_close($ch);
@@ -100,28 +104,35 @@ function sendWhatsApp(string $to, string $message): bool {
 // ─────────────────────────────────────────────────────────────
 //  Send Email via SMTP (Gmail-compatible, direct socket)
 // ─────────────────────────────────────────────────────────────
-function smtpRead($socket): string {
+function smtpRead($socket): string
+{
     $response = '';
     while (true) {
         $line = fgets($socket, 512);
-        if ($line === false) break;
+        if ($line === false)
+            break;
         $response .= $line;
         // SMTP multi-line: 4th char is '-' for continuation, ' ' for last line
-        if (isset($line[3]) && $line[3] === ' ') break;
+        if (isset($line[3]) && $line[3] === ' ')
+            break;
     }
     return $response;
 }
 
-function smtpSend($socket, string $cmd): string {
+function smtpSend($socket, string $cmd): string
+{
     fwrite($socket, $cmd);
     return smtpRead($socket);
 }
 
-function sendEmail(string $toEmail, string $toName, string $subject, string $htmlBody): bool {
-    if (!SMTP_USER || !SMTP_PASS || !$toEmail) return false;
+function sendEmail(string $toEmail, string $toName, string $subject, string $htmlBody): bool
+{
+    if (!SMTP_USER || !SMTP_PASS || !$toEmail)
+        return false;
     try {
         $socket = fsockopen('ssl://' . SMTP_HOST, SMTP_PORT, $errno, $errstr, 15);
-        if (!$socket) return false;
+        if (!$socket)
+            return false;
         stream_set_timeout($socket, 15);
 
         // Read greeting
@@ -129,31 +140,52 @@ function sendEmail(string $toEmail, string $toName, string $subject, string $htm
 
         // EHLO — Gmail sends multi-line response, must read ALL lines
         $ehlo = smtpSend($socket, "EHLO " . gethostname() . "\r\n");
-        if (strpos($ehlo, '250') === false) { fclose($socket); return false; }
+        if (strpos($ehlo, '250') === false) {
+            fclose($socket);
+            return false;
+        }
 
         // AUTH LOGIN
         $auth = smtpSend($socket, "AUTH LOGIN\r\n");
-        if (strpos($auth, '334') === false) { fclose($socket); return false; }
+        if (strpos($auth, '334') === false) {
+            fclose($socket);
+            return false;
+        }
 
         // Username
         $userRes = smtpSend($socket, base64_encode(SMTP_USER) . "\r\n");
-        if (strpos($userRes, '334') === false) { fclose($socket); return false; }
+        if (strpos($userRes, '334') === false) {
+            fclose($socket);
+            return false;
+        }
 
         // Password
         $passRes = smtpSend($socket, base64_encode(SMTP_PASS) . "\r\n");
-        if (strpos($passRes, '235') === false) { fclose($socket); return false; }
+        if (strpos($passRes, '235') === false) {
+            fclose($socket);
+            return false;
+        }
 
         // MAIL FROM
         $from = smtpSend($socket, "MAIL FROM:<" . SMTP_FROM . ">\r\n");
-        if (strpos($from, '250') === false) { fclose($socket); return false; }
+        if (strpos($from, '250') === false) {
+            fclose($socket);
+            return false;
+        }
 
         // RCPT TO
         $rcpt = smtpSend($socket, "RCPT TO:<$toEmail>\r\n");
-        if (strpos($rcpt, '250') === false) { fclose($socket); return false; }
+        if (strpos($rcpt, '250') === false) {
+            fclose($socket);
+            return false;
+        }
 
         // DATA
         $data = smtpSend($socket, "DATA\r\n");
-        if (strpos($data, '354') === false) { fclose($socket); return false; }
+        if (strpos($data, '354') === false) {
+            fclose($socket);
+            return false;
+        }
 
         // Build email
         $headers = implode("\r\n", [
@@ -166,7 +198,10 @@ function sendEmail(string $toEmail, string $toName, string $subject, string $htm
             "Message-ID: <" . uniqid('aikya_') . "@" . gethostname() . ">",
         ]);
         $msg = smtpSend($socket, "$headers\r\n\r\n$htmlBody\r\n.\r\n");
-        if (strpos($msg, '250') === false) { fclose($socket); return false; }
+        if (strpos($msg, '250') === false) {
+            fclose($socket);
+            return false;
+        }
 
         // QUIT
         smtpSend($socket, "QUIT\r\n");
@@ -182,20 +217,23 @@ function sendEmail(string $toEmail, string $toName, string $subject, string $htm
 // ─────────────────────────────────────────────────────────────
 
 /** Notify manager when a member checks in */
-function notifyCheckin(array $member, string $time, string $location): void {
+function notifyCheckin(array $member, string $time, string $location): void
+{
     $msg = "✅ *Aikya Task Portal*\n\n"
-         . "📍 *Check-In Alert*\n"
-         . "*{$member['name']}* has checked in.\n"
-         . "🕐 Time: $time\n"
-         . "📌 Location: $location";
+        . "📍 *Check-In Alert*\n"
+        . "*{$member['name']}* has checked in.\n"
+        . "🕐 Time: $time\n"
+        . "📌 Location: $location";
 
-    if (MANAGER_WHATSAPP) sendWhatsApp(MANAGER_WHATSAPP, $msg);
+    if (MANAGER_WHATSAPP)
+        sendWhatsApp(MANAGER_WHATSAPP, $msg);
 
     // Email to manager
     $db = getDB();
     $managers = $db->query("SELECT name, email FROM users WHERE role = 'admin'")->fetchAll();
     foreach ($managers as $mgr) {
-        if (!$mgr['email']) continue;
+        if (!$mgr['email'])
+            continue;
         $html = emailTemplate("Check-In Alert", "
             <p><strong>{$member['name']}</strong> has checked in.</p>
             <table>
@@ -208,15 +246,17 @@ function notifyCheckin(array $member, string $time, string $location): void {
 }
 
 /** Notify member when a task is assigned to them */
-function notifyTaskAssigned(array $task, array $member): void {
+function notifyTaskAssigned(array $task, array $member): void
+{
     $msg = "📋 *Aikya Task Portal*\n\n"
-         . "📌 *New Task Assigned to You*\n"
-         . "Task: *{$task['title']}*\n"
-         . "Priority: {$task['priority']}\n"
-         . ($task['due_date'] ? "Due: {$task['due_date']}\n" : '')
-         . "\nLog in to view details.";
+        . "📌 *New Task Assigned to You*\n"
+        . "Task: *{$task['title']}*\n"
+        . "Priority: {$task['priority']}\n"
+        . ($task['due_date'] ? "Due: {$task['due_date']}\n" : '')
+        . "\nLog in to view details.";
 
-    if ($member['phone']) sendWhatsApp($member['phone'], $msg);
+    if ($member['phone'])
+        sendWhatsApp($member['phone'], $msg);
 
     $html = emailTemplate("New Task Assigned", "
         <p>A new task has been assigned to you.</p>
@@ -231,20 +271,23 @@ function notifyTaskAssigned(array $task, array $member): void {
 }
 
 /** Notify manager when member adds a note */
-function notifyNoteAdded(array $task, array $member, string $noteText): void {
+function notifyNoteAdded(array $task, array $member, string $noteText): void
+{
     $short = mb_strlen($noteText) > 120 ? mb_substr($noteText, 0, 120) . '…' : $noteText;
     $msg = "💬 *Aikya Task Portal*\n\n"
-         . "📝 *New Note Added*\n"
-         . "Task: *{$task['title']}*\n"
-         . "By: {$member['name']}\n"
-         . "Note: $short";
+        . "📝 *New Note Added*\n"
+        . "Task: *{$task['title']}*\n"
+        . "By: {$member['name']}\n"
+        . "Note: $short";
 
-    if (MANAGER_WHATSAPP) sendWhatsApp(MANAGER_WHATSAPP, $msg);
+    if (MANAGER_WHATSAPP)
+        sendWhatsApp(MANAGER_WHATSAPP, $msg);
 
     $db = getDB();
     $managers = $db->query("SELECT name, email FROM users WHERE role = 'admin'")->fetchAll();
     foreach ($managers as $mgr) {
-        if (!$mgr['email']) continue;
+        if (!$mgr['email'])
+            continue;
         $html = emailTemplate("Note Added to Task", "
             <p><strong>{$member['name']}</strong> added a note to <strong>{$task['title']}</strong>.</p>
             <blockquote style='border-left:3px solid #7c3aed;padding:8px 16px;color:#555;margin:16px 0;'>$noteText</blockquote>
@@ -254,27 +297,34 @@ function notifyNoteAdded(array $task, array $member, string $noteText): void {
 }
 
 /** Notify manager when member updates task status */
-function notifyStatusChanged(array $task, array $member, string $oldStatus, string $newStatus): void {
+function notifyStatusChanged(array $task, array $member, string $oldStatus, string $newStatus): void
+{
     $labels = [
-        'new' => 'New', 'pending' => 'Pending', 'in_progress' => 'In Progress',
-        'completed' => 'Completed', 'need_clarification' => 'Need Clarification',
-        'pending_requirements' => 'Pending Requirements', 'paused' => 'Paused',
+        'new' => 'New',
+        'pending' => 'Pending',
+        'in_progress' => 'In Progress',
+        'completed' => 'Completed',
+        'need_clarification' => 'Need Clarification',
+        'pending_requirements' => 'Pending Requirements',
+        'paused' => 'Paused',
     ];
     $oldLabel = $labels[$oldStatus] ?? $oldStatus;
     $newLabel = $labels[$newStatus] ?? $newStatus;
 
     $msg = "🔄 *Aikya Task Portal*\n\n"
-         . "📊 *Task Status Changed*\n"
-         . "Task: *{$task['title']}*\n"
-         . "By: {$member['name']}\n"
-         . "$oldLabel → *$newLabel*";
+        . "📊 *Task Status Changed*\n"
+        . "Task: *{$task['title']}*\n"
+        . "By: {$member['name']}\n"
+        . "$oldLabel → *$newLabel*";
 
-    if (MANAGER_WHATSAPP) sendWhatsApp(MANAGER_WHATSAPP, $msg);
+    if (MANAGER_WHATSAPP)
+        sendWhatsApp(MANAGER_WHATSAPP, $msg);
 
     $db = getDB();
     $managers = $db->query("SELECT name, email FROM users WHERE role = 'admin'")->fetchAll();
     foreach ($managers as $mgr) {
-        if (!$mgr['email']) continue;
+        if (!$mgr['email'])
+            continue;
         $html = emailTemplate("Task Status Updated", "
             <p><strong>{$member['name']}</strong> updated the status of <strong>{$task['title']}</strong>.</p>
             <table>
@@ -289,7 +339,8 @@ function notifyStatusChanged(array $task, array $member, string $oldStatus, stri
 // ─────────────────────────────────────────────────────────────
 //  Email HTML Template
 // ─────────────────────────────────────────────────────────────
-function emailTemplate(string $heading, string $content): string {
+function emailTemplate(string $heading, string $content): string
+{
     return <<<HTML
 <!DOCTYPE html>
 <html>
