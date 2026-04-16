@@ -11,12 +11,19 @@
 //  3. Set MANAGER_WHATSAPP to manager's WhatsApp number (with country code, e.g. 919876543210)
 // ─────────────────────────────────────────────────────────────
 
-// ── SMTP Config (email) ───────────────────────────────────────
-define('SMTP_HOST',     'smtp.hostinger.com');   // Hostinger SMTP
-define('SMTP_PORT',     465);                     // SSL port
-define('SMTP_USER',     '');                      // your@domain.com
-define('SMTP_PASS',     '');                      // email password
-define('SMTP_FROM',     '');                      // sender email
+// ── SMTP Config (Gmail) ───────────────────────────────────────
+// HOW TO SET UP GMAIL SMTP:
+// 1. Go to https://myaccount.google.com/security
+// 2. Enable "2-Step Verification"
+// 3. Go to https://myaccount.google.com/apppasswords
+// 4. Create an App Password (select "Mail" → "Other" → name it "Aikya Portal")
+// 5. Copy the 16-character password and paste it below
+// ─────────────────────────────────────────────────────────────
+define('SMTP_HOST',     'smtp.gmail.com');         // Gmail SMTP
+define('SMTP_PORT',     465);                       // SSL port
+define('SMTP_USER',     '');                        // your-gmail@gmail.com
+define('SMTP_PASS',     '');                        // 16-char App Password (NOT your Gmail password)
+define('SMTP_FROM',     '');                        // same as SMTP_USER
 define('SMTP_FROM_NAME','Aikya Task Portal');
 
 // ── WhatsApp Config (choose ONE provider) ─────────────────────
@@ -91,40 +98,78 @@ function sendWhatsApp(string $to, string $message): bool {
 }
 
 // ─────────────────────────────────────────────────────────────
-//  Send Email via SMTP (direct socket, no library needed)
+//  Send Email via SMTP (Gmail-compatible, direct socket)
 // ─────────────────────────────────────────────────────────────
+function smtpRead($socket): string {
+    $response = '';
+    while (true) {
+        $line = fgets($socket, 512);
+        if ($line === false) break;
+        $response .= $line;
+        // SMTP multi-line: 4th char is '-' for continuation, ' ' for last line
+        if (isset($line[3]) && $line[3] === ' ') break;
+    }
+    return $response;
+}
+
+function smtpSend($socket, string $cmd): string {
+    fwrite($socket, $cmd);
+    return smtpRead($socket);
+}
+
 function sendEmail(string $toEmail, string $toName, string $subject, string $htmlBody): bool {
     if (!SMTP_USER || !SMTP_PASS || !$toEmail) return false;
     try {
-        $socket = fsockopen('ssl://' . SMTP_HOST, SMTP_PORT, $errno, $errstr, 10);
+        $socket = fsockopen('ssl://' . SMTP_HOST, SMTP_PORT, $errno, $errstr, 15);
         if (!$socket) return false;
-        $read = fgets($socket, 512);
+        stream_set_timeout($socket, 15);
 
-        $cmds = [
-            "EHLO " . gethostname() . "\r\n",
-            "AUTH LOGIN\r\n",
-            base64_encode(SMTP_USER)  . "\r\n",
-            base64_encode(SMTP_PASS)  . "\r\n",
-            "MAIL FROM:<" . SMTP_FROM . ">\r\n",
-            "RCPT TO:<$toEmail>\r\n",
-            "DATA\r\n",
-        ];
-        foreach ($cmds as $cmd) {
-            fwrite($socket, $cmd);
-            fgets($socket, 512);
-        }
+        // Read greeting
+        smtpRead($socket);
 
-        $boundary = md5(time());
-        $headers  = implode("\r\n", [
+        // EHLO — Gmail sends multi-line response, must read ALL lines
+        $ehlo = smtpSend($socket, "EHLO " . gethostname() . "\r\n");
+        if (strpos($ehlo, '250') === false) { fclose($socket); return false; }
+
+        // AUTH LOGIN
+        $auth = smtpSend($socket, "AUTH LOGIN\r\n");
+        if (strpos($auth, '334') === false) { fclose($socket); return false; }
+
+        // Username
+        $userRes = smtpSend($socket, base64_encode(SMTP_USER) . "\r\n");
+        if (strpos($userRes, '334') === false) { fclose($socket); return false; }
+
+        // Password
+        $passRes = smtpSend($socket, base64_encode(SMTP_PASS) . "\r\n");
+        if (strpos($passRes, '235') === false) { fclose($socket); return false; }
+
+        // MAIL FROM
+        $from = smtpSend($socket, "MAIL FROM:<" . SMTP_FROM . ">\r\n");
+        if (strpos($from, '250') === false) { fclose($socket); return false; }
+
+        // RCPT TO
+        $rcpt = smtpSend($socket, "RCPT TO:<$toEmail>\r\n");
+        if (strpos($rcpt, '250') === false) { fclose($socket); return false; }
+
+        // DATA
+        $data = smtpSend($socket, "DATA\r\n");
+        if (strpos($data, '354') === false) { fclose($socket); return false; }
+
+        // Build email
+        $headers = implode("\r\n", [
             "From: " . SMTP_FROM_NAME . " <" . SMTP_FROM . ">",
             "To: $toName <$toEmail>",
             "Subject: $subject",
             "MIME-Version: 1.0",
             "Content-Type: text/html; charset=UTF-8",
+            "Date: " . date('r'),
+            "Message-ID: <" . uniqid('aikya_') . "@" . gethostname() . ">",
         ]);
-        fwrite($socket, "$headers\r\n\r\n$htmlBody\r\n.\r\n");
-        fgets($socket, 512);
-        fwrite($socket, "QUIT\r\n");
+        $msg = smtpSend($socket, "$headers\r\n\r\n$htmlBody\r\n.\r\n");
+        if (strpos($msg, '250') === false) { fclose($socket); return false; }
+
+        // QUIT
+        smtpSend($socket, "QUIT\r\n");
         fclose($socket);
         return true;
     } catch (\Exception $e) {
