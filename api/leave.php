@@ -190,9 +190,21 @@ if ($method === 'POST') {
         WHERE l.id = ?
     ");
     $fetch->execute([$id]);
-    $leave = formatLeave($fetch->fetch());
+    $row = $fetch->fetch();
+    if (!$row) respond(['leave' => null], 201);
+    $leave = formatLeave($row);
 
-    // Notify manager
+    // Send response FIRST so client isn't waiting for notifications
+    http_response_code(201);
+    echo json_encode(['leave' => $leave]);
+    if (function_exists('fastcgi_finish_request')) {
+        fastcgi_finish_request();
+    } else {
+        if (ob_get_level()) ob_end_flush();
+        flush();
+    }
+
+    // NOW try notifications (client already has response)
     try {
         $typeLabels = [
             'casual' => 'Casual Leave', 'sick' => 'Sick Leave', 'earned' => 'Earned Leave',
@@ -228,9 +240,8 @@ if ($method === 'POST') {
             ");
             sendEmail($mgr['email'], $mgr['name'], "🏖️ Leave Request: {$user['name']} — Aikya Portal", $html);
         }
-    } catch (\Exception $e) { /* silent fail */ }
-
-    respond(['leave' => $leave], 201);
+    } catch (\Throwable $e) { /* silent fail */ }
+    exit;
 }
 
 // ── PUT — approve/reject/cancel ────────────────────────────────
@@ -276,7 +287,33 @@ if ($method === 'PUT') {
         $db->prepare("UPDATE leaves SET status = ?, approved_by = ?, admin_note = ?, updated_at = ? WHERE id = ?")
            ->execute([$newStatus, $user['id'], $adminNote ?: null, $IST_NOW, $id]);
 
-        // Notify the member
+    }
+
+    // Fetch updated
+    $fetch = $db->prepare("
+        SELECT l.*, u.name AS user_name, u.avatar AS user_avatar, u.color AS user_color,
+               u.department, ua.name AS approved_by_name
+        FROM leaves l
+        JOIN users u ON l.user_id = u.id
+        LEFT JOIN users ua ON l.approved_by = ua.id
+        WHERE l.id = ?
+    ");
+    $fetch->execute([$id]);
+    $updatedRow = $fetch->fetch();
+    $updatedLeave = $updatedRow ? formatLeave($updatedRow) : null;
+
+    // Send response FIRST so client isn't waiting for notifications
+    http_response_code(200);
+    echo json_encode(['leave' => $updatedLeave]);
+    if (function_exists('fastcgi_finish_request')) {
+        fastcgi_finish_request();
+    } else {
+        if (ob_get_level()) ob_end_flush();
+        flush();
+    }
+
+    // NOW try to notify the member (client already has response)
+    if ($user['role'] === 'admin') {
         try {
             $memberRow = $db->prepare('SELECT name, email, phone FROM users WHERE id = ?');
             $memberRow->execute([$existing['user_id']]);
@@ -304,20 +341,9 @@ if ($method === 'PUT') {
                 ");
                 sendEmail($member['email'], $member['name'], "$emoji Leave $statusLabel — Aikya Portal", $html);
             }
-        } catch (\Exception $e) { /* silent fail */ }
+        } catch (\Throwable $e) { /* silent fail */ }
     }
-
-    // Fetch updated
-    $fetch = $db->prepare("
-        SELECT l.*, u.name AS user_name, u.avatar AS user_avatar, u.color AS user_color,
-               u.department, ua.name AS approved_by_name
-        FROM leaves l
-        JOIN users u ON l.user_id = u.id
-        LEFT JOIN users ua ON l.approved_by = ua.id
-        WHERE l.id = ?
-    ");
-    $fetch->execute([$id]);
-    respond(['leave' => formatLeave($fetch->fetch())]);
+    exit;
 }
 
 // ── DELETE — remove leave (admin only) ───────────────────────

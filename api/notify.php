@@ -207,7 +207,7 @@ function sendEmail(string $toEmail, string $toName, string $subject, string $htm
         smtpSend($socket, "QUIT\r\n");
         fclose($socket);
         return true;
-    } catch (\Exception $e) {
+    } catch (\Throwable $e) {
         return false;
     }
 }
