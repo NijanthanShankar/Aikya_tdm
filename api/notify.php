@@ -21,10 +21,10 @@
 // ─────────────────────────────────────────────────────────────
 define('SMTP_HOST', 'smtp.gmail.com');         // Gmail SMTP
 define('SMTP_PORT', 465);                       // SSL port
-define('SMTP_USER', 'nijanthan1952@gmail.com');                        // your-gmail@gmail.com
-define('SMTP_PASS', 'jxoa xvta oerg qpzm');                        // 16-char App Password (NOT your Gmail password)
-define('SMTP_FROM', 'nijanthan1952@gmail.com');                        // same as SMTP_USER
-define('SMTP_FROM_NAME', 'Aikya Task Portal');
+define('SMTP_USER', 'info2aikya299@gmail.com');                        // your-gmail@gmail.com
+define('SMTP_PASS', 'niia atil psar djar');                        // 16-char App Password (NOT your Gmail password)
+define('SMTP_FROM', 'info2aikya299@gmail.com');                        // same as SMTP_USER
+define('SMTP_FROM_NAME', 'Aikya Portal');
 
 // ── WhatsApp Config (choose ONE provider) ─────────────────────
 // Option A: UltraMsg (recommended — easy, cheap)
