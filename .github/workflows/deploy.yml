@@ -8,6 +8,8 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,8 +25,8 @@ jobs:
       - name: Build React app
         run: npm run build
 
-      - name: Deploy frontend (dist/) to Hostinger — clean slate
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+      - name: Deploy frontend (dist/) to Hostinger
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
@@ -32,10 +34,10 @@ jobs:
           local-dir: ./dist/
           server-dir: ${{ secrets.FTP_SERVER_DIR }}
           dangerous-clean-slate: true
-          timeout: 60000
+          timeout: 120000
 
-      - name: Deploy API (api/) to Hostinger — clean slate
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+      - name: Deploy API (api/) to Hostinger
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
@@ -43,4 +45,4 @@ jobs:
           local-dir: ./api/
           server-dir: ${{ secrets.FTP_SERVER_DIR }}api/
           dangerous-clean-slate: true
-          timeout: 60000
+          timeout: 120000
