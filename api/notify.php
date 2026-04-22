@@ -130,10 +130,10 @@ function sendEmail(string $toEmail, string $toName, string $subject, string $htm
     if (!SMTP_USER || !SMTP_PASS || !$toEmail)
         return false;
     try {
-        $socket = fsockopen('ssl://' . SMTP_HOST, SMTP_PORT, $errno, $errstr, 15);
+        $socket = fsockopen('ssl://' . SMTP_HOST, SMTP_PORT, $errno, $errstr, 5);
         if (!$socket)
             return false;
-        stream_set_timeout($socket, 15);
+        stream_set_timeout($socket, 5);
 
         // Read greeting
         smtpRead($socket);
