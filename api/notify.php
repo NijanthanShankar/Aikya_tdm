@@ -19,29 +19,29 @@
 // 4. Create an App Password (select "Mail" → "Other" → name it "Aikya Portal")
 // 5. Copy the 16-character password and paste it below
 // ─────────────────────────────────────────────────────────────
-define('SMTP_HOST', 'smtp.gmail.com');         // Gmail SMTP
-define('SMTP_PORT', 465);                       // SSL port
-define('SMTP_USER', 'info2aikya299@gmail.com');                        // your-gmail@gmail.com
-define('SMTP_PASS', 'niia atil psar djar');                        // 16-char App Password (NOT your Gmail password)
-define('SMTP_FROM', 'info2aikya299@gmail.com');                        // same as SMTP_USER
-define('SMTP_FROM_NAME', 'Aikya Portal');
+if (!defined('SMTP_HOST'))      define('SMTP_HOST', 'smtp.gmail.com');
+if (!defined('SMTP_PORT'))      define('SMTP_PORT', 465);
+if (!defined('SMTP_USER'))      define('SMTP_USER', 'info2aikya299@gmail.com');
+if (!defined('SMTP_PASS'))      define('SMTP_PASS', 'niia atil psar djar');
+if (!defined('SMTP_FROM'))      define('SMTP_FROM', 'info2aikya299@gmail.com');
+if (!defined('SMTP_FROM_NAME')) define('SMTP_FROM_NAME', 'Aikya Portal');
 
 // ── WhatsApp Config (choose ONE provider) ─────────────────────
 // Option A: UltraMsg (recommended — easy, cheap)
-define('ULTRAMSG_INSTANCE', '');                  // e.g. instance12345
-define('ULTRAMSG_TOKEN', '');                  // API token from ultramsg.com
+if (!defined('ULTRAMSG_INSTANCE')) define('ULTRAMSG_INSTANCE', '');
+if (!defined('ULTRAMSG_TOKEN'))    define('ULTRAMSG_TOKEN', '');
 
 // Option B: Twilio
-define('TWILIO_SID', '');
-define('TWILIO_TOKEN', '');
-define('TWILIO_FROM', 'whatsapp:+14155238886');  // Twilio sandbox number
+if (!defined('TWILIO_SID'))   define('TWILIO_SID', '');
+if (!defined('TWILIO_TOKEN')) define('TWILIO_TOKEN', '');
+if (!defined('TWILIO_FROM'))  define('TWILIO_FROM', 'whatsapp:+14155238886');
 
 // ── Active provider: 'ultramsg' | 'twilio' | 'none' ──────────
-define('WHATSAPP_PROVIDER', 'ultramsg');
+if (!defined('WHATSAPP_PROVIDER')) define('WHATSAPP_PROVIDER', 'ultramsg');
 
 // ── Manager phone (WhatsApp) ──────────────────────────────────
 // Add the manager's WhatsApp number with country code (no + sign)
-define('MANAGER_WHATSAPP', '');                   // e.g. 919876543210
+if (!defined('MANAGER_WHATSAPP')) define('MANAGER_WHATSAPP', '');
 
 // ─────────────────────────────────────────────────────────────
 //  Send WhatsApp message
@@ -130,7 +130,7 @@ function sendEmail(string $toEmail, string $toName, string $subject, string $htm
     if (!SMTP_USER || !SMTP_PASS || !$toEmail)
         return false;
     try {
-        $socket = fsockopen('ssl://' . SMTP_HOST, SMTP_PORT, $errno, $errstr, 5);
+        $socket = @fsockopen('ssl://' . SMTP_HOST, SMTP_PORT, $errno, $errstr, 5);
         if (!$socket)
             return false;
         stream_set_timeout($socket, 5);

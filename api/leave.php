@@ -11,10 +11,17 @@
 
 require_once 'config.php';
 require_once 'helpers.php';
-require_once 'notify.php';
+
+// Load notify.php safely — if it fails, notifications just won't work
+$notifyLoaded = false;
+try {
+    require_once 'notify.php';
+    $notifyLoaded = true;
+} catch (\Throwable $e) {
+    // notify.php failed to load — continue without notifications
+}
 
 $method = $_SERVER['REQUEST_METHOD'];
-$db     = getDB();
 $action = $_GET['action'] ?? '';
 
 // ── IST time constants ────────────────────────────────────────
@@ -36,309 +43,391 @@ $LEAVE_QUOTAS = [
     'other'        => 6,
 ];
 
+// ── Get DB connection with auto-table creation ────────────────
+try {
+    $db = getDB();
+} catch (\Throwable $e) {
+    respondError('Database connection failed: ' . $e->getMessage(), 500);
+}
+
+// ── Ensure leaves table exists ────────────────────────────────
+try {
+    $db->query("SELECT 1 FROM leaves LIMIT 1");
+} catch (\Throwable $e) {
+    // Table doesn't exist — create it
+    try {
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS leaves (
+                id            VARCHAR(32)   PRIMARY KEY,
+                user_id       VARCHAR(32)   NOT NULL,
+                leave_type    VARCHAR(20)   NOT NULL DEFAULT 'casual',
+                from_date     DATE          NOT NULL,
+                to_date       DATE          NOT NULL,
+                num_days      DECIMAL(4,1)  NOT NULL DEFAULT 1,
+                reason        TEXT          NOT NULL,
+                status        VARCHAR(20)   NOT NULL DEFAULT 'pending',
+                approved_by   VARCHAR(32)   DEFAULT NULL,
+                admin_note    TEXT          DEFAULT NULL,
+                created_at    DATETIME      DEFAULT CURRENT_TIMESTAMP,
+                updated_at    DATETIME      DEFAULT NULL,
+                INDEX idx_user     (user_id),
+                INDEX idx_status   (status),
+                INDEX idx_dates    (from_date, to_date)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        ");
+    } catch (\Throwable $e2) {
+        respondError('Failed to create leaves table: ' . $e2->getMessage(), 500);
+    }
+}
+
 // ── GET — list leaves ─────────────────────────────────────────
 if ($method === 'GET') {
     $user = requireMember();
 
     // Leave balance
     if ($action === 'balance') {
-        $targetUser = $_GET['user_id'] ?? $user['id'];
-        // Members can only see own balance
-        if ($user['role'] !== 'admin') $targetUser = $user['id'];
+        try {
+            $targetUser = $_GET['user_id'] ?? $user['id'];
+            // Members can only see own balance
+            if ($user['role'] !== 'admin') $targetUser = $user['id'];
 
-        $year = $_GET['year'] ?? date('Y');
+            $year = $_GET['year'] ?? date('Y');
 
-        $stmt = $db->prepare("
-            SELECT leave_type, COUNT(*) as used
-            FROM leaves
-            WHERE user_id = ? AND status = 'approved'
-              AND YEAR(from_date) = ?
-            GROUP BY leave_type
-        ");
-        $stmt->execute([$targetUser, $year]);
-        $usedMap = [];
-        foreach ($stmt->fetchAll() as $row) {
-            $usedMap[$row['leave_type']] = (int)$row['used'];
+            $stmt = $db->prepare("
+                SELECT leave_type, COUNT(*) as used
+                FROM leaves
+                WHERE user_id = ? AND status = 'approved'
+                  AND YEAR(from_date) = ?
+                GROUP BY leave_type
+            ");
+            $stmt->execute([$targetUser, $year]);
+            $usedMap = [];
+            foreach ($stmt->fetchAll() as $row) {
+                $usedMap[$row['leave_type']] = (int)$row['used'];
+            }
+
+            $balance = [];
+            foreach ($LEAVE_QUOTAS as $type => $total) {
+                $used = $usedMap[$type] ?? 0;
+                $balance[] = [
+                    'type'      => $type,
+                    'total'     => $total,
+                    'used'      => $used,
+                    'remaining' => max(0, $total - $used),
+                ];
+            }
+
+            respond(['balance' => $balance, 'year' => $year]);
+        } catch (\Throwable $e) {
+            respondError('Failed to get leave balance: ' . $e->getMessage(), 500);
         }
-
-        $balance = [];
-        foreach ($LEAVE_QUOTAS as $type => $total) {
-            $used = $usedMap[$type] ?? 0;
-            $balance[] = [
-                'type'      => $type,
-                'total'     => $total,
-                'used'      => $used,
-                'remaining' => max(0, $total - $used),
-            ];
-        }
-
-        respond(['balance' => $balance, 'year' => $year]);
     }
 
     // Admin: all leaves
     if ($action === 'all') {
         requireAdmin();
+        try {
+            $where  = ['1=1'];
+            $params = [];
 
-        $where  = ['1=1'];
-        $params = [];
+            if (!empty($_GET['status'])) {
+                $where[]  = 'l.status = ?';
+                $params[] = $_GET['status'];
+            }
+            if (!empty($_GET['user_id'])) {
+                $where[]  = 'l.user_id = ?';
+                $params[] = $_GET['user_id'];
+            }
+            if (!empty($_GET['month'])) {
+                $where[]  = "(DATE_FORMAT(l.from_date, '%Y-%m') = ? OR DATE_FORMAT(l.to_date, '%Y-%m') = ?)";
+                $params[] = $_GET['month'];
+                $params[] = $_GET['month'];
+            }
 
-        if (!empty($_GET['status'])) {
-            $where[]  = 'l.status = ?';
-            $params[] = $_GET['status'];
+            $sql = "
+                SELECT l.*, u.name AS user_name, u.avatar AS user_avatar, u.color AS user_color,
+                       u.department, ua.name AS approved_by_name
+                FROM leaves l
+                JOIN users u ON l.user_id = u.id
+                LEFT JOIN users ua ON l.approved_by = ua.id
+                WHERE " . implode(' AND ', $where) . "
+                ORDER BY l.created_at DESC
+            ";
+            $stmt = $db->prepare($sql);
+            $stmt->execute($params);
+            respond(['leaves' => array_map('formatLeave', $stmt->fetchAll())]);
+        } catch (\Throwable $e) {
+            respondError('Failed to list leaves: ' . $e->getMessage(), 500);
         }
-        if (!empty($_GET['user_id'])) {
-            $where[]  = 'l.user_id = ?';
-            $params[] = $_GET['user_id'];
-        }
-        if (!empty($_GET['month'])) {
-            $where[]  = "(DATE_FORMAT(l.from_date, '%Y-%m') = ? OR DATE_FORMAT(l.to_date, '%Y-%m') = ?)";
-            $params[] = $_GET['month'];
-            $params[] = $_GET['month'];
-        }
+    }
 
-        $sql = "
+    // Member: own leaves
+    try {
+        $year = $_GET['year'] ?? date('Y');
+        $stmt = $db->prepare("
             SELECT l.*, u.name AS user_name, u.avatar AS user_avatar, u.color AS user_color,
                    u.department, ua.name AS approved_by_name
             FROM leaves l
             JOIN users u ON l.user_id = u.id
             LEFT JOIN users ua ON l.approved_by = ua.id
-            WHERE " . implode(' AND ', $where) . "
+            WHERE l.user_id = ? AND YEAR(l.from_date) = ?
             ORDER BY l.created_at DESC
-        ";
-        $stmt = $db->prepare($sql);
-        $stmt->execute($params);
+        ");
+        $stmt->execute([$user['id'], $year]);
         respond(['leaves' => array_map('formatLeave', $stmt->fetchAll())]);
+    } catch (\Throwable $e) {
+        respondError('Failed to list your leaves: ' . $e->getMessage(), 500);
     }
-
-    // Member: own leaves
-    $year = $_GET['year'] ?? date('Y');
-    $stmt = $db->prepare("
-        SELECT l.*, u.name AS user_name, u.avatar AS user_avatar, u.color AS user_color,
-               u.department, ua.name AS approved_by_name
-        FROM leaves l
-        JOIN users u ON l.user_id = u.id
-        LEFT JOIN users ua ON l.approved_by = ua.id
-        WHERE l.user_id = ? AND YEAR(l.from_date) = ?
-        ORDER BY l.created_at DESC
-    ");
-    $stmt->execute([$user['id'], $year]);
-    respond(['leaves' => array_map('formatLeave', $stmt->fetchAll())]);
 }
 
 // ── POST — apply for leave ────────────────────────────────────
 if ($method === 'POST') {
     $user = requireMember();
-    $body = getBody();
 
-    $leaveType = trim($body['leaveType'] ?? '');
-    $fromDate  = trim($body['fromDate']  ?? '');
-    $toDate    = trim($body['toDate']    ?? '');
-    $reason    = trim($body['reason']    ?? '');
-
-    // Validate required
-    if (!$leaveType) respondError('Leave type is required.');
-    if (!$fromDate)  respondError('Start date is required.');
-    if (!$toDate)    respondError('End date is required.');
-    if (!$reason)    respondError('Reason is required.');
-
-    // Validate type
-    if (!in_array($leaveType, $VALID_TYPES, true)) {
-        respondError('Invalid leave type.');
-    }
-
-    // Validate dates
-    if ($toDate < $fromDate) {
-        respondError('End date cannot be before start date.');
-    }
-
-    // Calculate number of days
-    $start = new DateTime($fromDate);
-    $end   = new DateTime($toDate);
-    $diff  = $start->diff($end);
-    $numDays = $diff->days + 1;
-
-    // For half-day, it's always 0.5
-    if ($leaveType === 'half_day') {
-        $numDays = 0.5;
-        $toDate  = $fromDate; // half day is single day
-    }
-
-    // Check for overlapping leave requests
-    $overlap = $db->prepare("
-        SELECT id FROM leaves
-        WHERE user_id = ? AND status IN ('pending', 'approved')
-          AND from_date <= ? AND to_date >= ?
-    ");
-    $overlap->execute([$user['id'], $toDate, $fromDate]);
-    if ($overlap->fetch()) {
-        respondError('You already have a leave request for the selected dates.');
-    }
-
-    $id = generateId();
-    $stmt = $db->prepare("
-        INSERT INTO leaves (id, user_id, leave_type, from_date, to_date, num_days, reason, status, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)
-    ");
-    $stmt->execute([$id, $user['id'], $leaveType, $fromDate, $toDate, $numDays, $reason, $IST_NOW]);
-
-    // Fetch back
-    $fetch = $db->prepare("
-        SELECT l.*, u.name AS user_name, u.avatar AS user_avatar, u.color AS user_color,
-               u.department, NULL AS approved_by_name
-        FROM leaves l
-        JOIN users u ON l.user_id = u.id
-        WHERE l.id = ?
-    ");
-    $fetch->execute([$id]);
-    $row = $fetch->fetch();
-    $leave = $row ? formatLeave($row) : null;
-
-    // Try notifications (silently — never block the response)
     try {
-        $typeLabels = [
-            'casual' => 'Casual Leave', 'sick' => 'Sick Leave', 'earned' => 'Earned Leave',
-            'half_day' => 'Half Day', 'wfh' => 'Work From Home',
-            'compensatory' => 'Compensatory Off', 'other' => 'Other Leave',
-        ];
-        $typeLabel = $typeLabels[$leaveType] ?? $leaveType;
+        $body = getBody();
 
-        $msg = "📋 *Aikya Task Portal*\n\n"
-             . "🏖️ *New Leave Request*\n"
-             . "By: *{$user['name']}*\n"
-             . "Type: $typeLabel\n"
-             . "From: $fromDate\n"
-             . "To: $toDate\n"
-             . "Days: $numDays\n"
-             . "Reason: $reason";
+        $leaveType = trim($body['leaveType'] ?? '');
+        $fromDate  = trim($body['fromDate']  ?? '');
+        $toDate    = trim($body['toDate']    ?? '');
+        $reason    = trim($body['reason']    ?? '');
 
-        if (MANAGER_WHATSAPP) sendWhatsApp(MANAGER_WHATSAPP, $msg);
+        // Validate required
+        if (!$leaveType) respondError('Leave type is required.');
+        if (!$fromDate)  respondError('Start date is required.');
+        if (!$toDate)    respondError('End date is required.');
+        if (!$reason)    respondError('Reason is required.');
 
-        // Email managers
-        $managers = $db->query("SELECT name, email FROM users WHERE role = 'admin'")->fetchAll();
-        foreach ($managers as $mgr) {
-            if (!$mgr['email']) continue;
-            $html = emailTemplate("New Leave Request", "
-                <p><strong>{$user['name']}</strong> has applied for leave.</p>
-                <table>
-                    <tr><td>🏷️ Type</td><td><strong>$typeLabel</strong></td></tr>
-                    <tr><td>📅 From</td><td>$fromDate</td></tr>
-                    <tr><td>📅 To</td><td>$toDate</td></tr>
-                    <tr><td>📊 Days</td><td>$numDays</td></tr>
-                    <tr><td>📝 Reason</td><td>$reason</td></tr>
-                </table>
-            ");
-            sendEmail($mgr['email'], $mgr['name'], "🏖️ Leave Request: {$user['name']} — Aikya Portal", $html);
+        // Validate type
+        if (!in_array($leaveType, $VALID_TYPES, true)) {
+            respondError('Invalid leave type.');
         }
-    } catch (\Throwable $e) { /* silent fail — don't block leave creation */ }
 
-    respond(['leave' => $leave], 201);
+        // Validate date formats
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fromDate)) {
+            respondError('Invalid start date format. Use YYYY-MM-DD.');
+        }
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $toDate)) {
+            respondError('Invalid end date format. Use YYYY-MM-DD.');
+        }
+
+        // Validate dates
+        if ($toDate < $fromDate) {
+            respondError('End date cannot be before start date.');
+        }
+
+        // Calculate number of days
+        $start = new DateTime($fromDate);
+        $end   = new DateTime($toDate);
+        $diff  = $start->diff($end);
+        $numDays = $diff->days + 1;
+
+        // For half-day, it's always 0.5
+        if ($leaveType === 'half_day') {
+            $numDays = 0.5;
+            $toDate  = $fromDate; // half day is single day
+        }
+
+        // Check for overlapping leave requests
+        $overlap = $db->prepare("
+            SELECT id FROM leaves
+            WHERE user_id = ? AND status IN ('pending', 'approved')
+              AND from_date <= ? AND to_date >= ?
+        ");
+        $overlap->execute([$user['id'], $toDate, $fromDate]);
+        if ($overlap->fetch()) {
+            respondError('You already have a leave request for the selected dates.');
+        }
+
+        $id = generateId();
+        $stmt = $db->prepare("
+            INSERT INTO leaves (id, user_id, leave_type, from_date, to_date, num_days, reason, status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+        ");
+        $stmt->execute([$id, $user['id'], $leaveType, $fromDate, $toDate, $numDays, $reason, $IST_NOW]);
+
+        // Fetch back
+        $fetch = $db->prepare("
+            SELECT l.*, u.name AS user_name, u.avatar AS user_avatar, u.color AS user_color,
+                   u.department, NULL AS approved_by_name
+            FROM leaves l
+            JOIN users u ON l.user_id = u.id
+            WHERE l.id = ?
+        ");
+        $fetch->execute([$id]);
+        $row = $fetch->fetch();
+        $leave = $row ? formatLeave($row) : null;
+
+        // Try notifications (silently — NEVER block the response)
+        if ($notifyLoaded) {
+            try {
+                $typeLabels = [
+                    'casual' => 'Casual Leave', 'sick' => 'Sick Leave', 'earned' => 'Earned Leave',
+                    'half_day' => 'Half Day', 'wfh' => 'Work From Home',
+                    'compensatory' => 'Compensatory Off', 'other' => 'Other Leave',
+                ];
+                $typeLabel = $typeLabels[$leaveType] ?? $leaveType;
+
+                $msg = "📋 *Aikya Task Portal*\n\n"
+                     . "🏖️ *New Leave Request*\n"
+                     . "By: *{$user['name']}*\n"
+                     . "Type: $typeLabel\n"
+                     . "From: $fromDate\n"
+                     . "To: $toDate\n"
+                     . "Days: $numDays\n"
+                     . "Reason: $reason";
+
+                if (defined('MANAGER_WHATSAPP') && MANAGER_WHATSAPP && function_exists('sendWhatsApp')) {
+                    @sendWhatsApp(MANAGER_WHATSAPP, $msg);
+                }
+
+                // Email managers
+                if (function_exists('sendEmail') && function_exists('emailTemplate')) {
+                    $managers = $db->query("SELECT name, email FROM users WHERE role = 'admin'")->fetchAll();
+                    foreach ($managers as $mgr) {
+                        if (!$mgr['email']) continue;
+                        $html = emailTemplate("New Leave Request", "
+                            <p><strong>{$user['name']}</strong> has applied for leave.</p>
+                            <table>
+                                <tr><td>🏷️ Type</td><td><strong>$typeLabel</strong></td></tr>
+                                <tr><td>📅 From</td><td>$fromDate</td></tr>
+                                <tr><td>📅 To</td><td>$toDate</td></tr>
+                                <tr><td>📊 Days</td><td>$numDays</td></tr>
+                                <tr><td>📝 Reason</td><td>$reason</td></tr>
+                            </table>
+                        ");
+                        @sendEmail($mgr['email'], $mgr['name'], "🏖️ Leave Request: {$user['name']} — Aikya Portal", $html);
+                    }
+                }
+            } catch (\Throwable $e) { /* silent fail — don't block leave creation */ }
+        }
+
+        respond(['leave' => $leave], 201);
+
+    } catch (\Throwable $e) {
+        respondError('Failed to apply leave: ' . $e->getMessage(), 500);
+    }
 }
 
 // ── PUT — approve/reject/cancel ────────────────────────────────
 if ($method === 'PUT') {
     $user = requireMember();
-    $id   = $_GET['id'] ?? '';
-    $body = getBody();
 
-    if (!$id) respondError('Leave ID required.');
+    try {
+        $id   = $_GET['id'] ?? '';
+        $body = getBody();
 
-    $check = $db->prepare('SELECT * FROM leaves WHERE id = ?');
-    $check->execute([$id]);
-    $existing = $check->fetch();
-    if (!$existing) respondError('Leave request not found.', 404);
+        if (!$id) respondError('Leave ID required.');
 
-    $newStatus = trim($body['status'] ?? '');
-    $adminNote = '';
+        $check = $db->prepare('SELECT * FROM leaves WHERE id = ?');
+        $check->execute([$id]);
+        $existing = $check->fetch();
+        if (!$existing) respondError('Leave request not found.', 404);
 
-    // Member can only cancel their own pending requests
-    if ($user['role'] !== 'admin') {
-        if ($existing['user_id'] !== $user['id']) {
-            respondError('Access denied.', 403);
-        }
-        if ($newStatus !== 'cancelled') {
-            respondError('You can only cancel your leave request.');
-        }
-        if ($existing['status'] !== 'pending') {
-            respondError('Only pending requests can be cancelled.');
-        }
+        $newStatus = trim($body['status'] ?? '');
+        $adminNote = '';
 
-        $db->prepare("UPDATE leaves SET status = 'cancelled', updated_at = ? WHERE id = ?")
-           ->execute([$IST_NOW, $id]);
-    } else {
-        // Admin can approve or reject
-        if (!in_array($newStatus, ['approved', 'rejected'], true)) {
-            respondError('Status must be approved or rejected.');
-        }
-        if ($existing['status'] !== 'pending') {
-            respondError('Only pending requests can be approved/rejected.');
-        }
-
-        $adminNote = trim($body['adminNote'] ?? '');
-
-        $db->prepare("UPDATE leaves SET status = ?, approved_by = ?, admin_note = ?, updated_at = ? WHERE id = ?")
-           ->execute([$newStatus, $user['id'], $adminNote ?: null, $IST_NOW, $id]);
-    }
-
-    // Fetch updated
-    $fetch = $db->prepare("
-        SELECT l.*, u.name AS user_name, u.avatar AS user_avatar, u.color AS user_color,
-               u.department, ua.name AS approved_by_name
-        FROM leaves l
-        JOIN users u ON l.user_id = u.id
-        LEFT JOIN users ua ON l.approved_by = ua.id
-        WHERE l.id = ?
-    ");
-    $fetch->execute([$id]);
-    $updatedRow = $fetch->fetch();
-    $updatedLeave = $updatedRow ? formatLeave($updatedRow) : null;
-
-    // Notify the member (silently — never block the response)
-    if ($user['role'] === 'admin') {
-        try {
-            $memberRow = $db->prepare('SELECT name, email, phone FROM users WHERE id = ?');
-            $memberRow->execute([$existing['user_id']]);
-            $member = $memberRow->fetch();
-
-            if ($member) {
-                $emoji = $newStatus === 'approved' ? '✅' : '❌';
-                $statusLabel = ucfirst($newStatus);
-
-                $msg = "$emoji *Aikya Task Portal*\n\n"
-                     . "🏖️ *Leave Request $statusLabel*\n"
-                     . "Your leave from {$existing['from_date']} to {$existing['to_date']} has been *$statusLabel*."
-                     . ($adminNote ? "\n📝 Note: $adminNote" : '');
-
-                if ($member['phone']) sendWhatsApp($member['phone'], $msg);
-
-                $html = emailTemplate("Leave Request $statusLabel", "
-                    <p>Your leave request has been <strong>$statusLabel</strong> by {$user['name']}.</p>
-                    <table>
-                        <tr><td>📅 From</td><td>{$existing['from_date']}</td></tr>
-                        <tr><td>📅 To</td><td>{$existing['to_date']}</td></tr>
-                        <tr><td>📊 Status</td><td><strong>$emoji $statusLabel</strong></td></tr>"
-                    . ($adminNote ? "<tr><td>📝 Note</td><td>$adminNote</td></tr>" : '') . "
-                    </table>
-                ");
-                sendEmail($member['email'], $member['name'], "$emoji Leave $statusLabel — Aikya Portal", $html);
+        // Member can only cancel their own pending requests
+        if ($user['role'] !== 'admin') {
+            if ($existing['user_id'] !== $user['id']) {
+                respondError('Access denied.', 403);
             }
-        } catch (\Throwable $e) { /* silent fail — don't block status update */ }
-    }
+            if ($newStatus !== 'cancelled') {
+                respondError('You can only cancel your leave request.');
+            }
+            if ($existing['status'] !== 'pending') {
+                respondError('Only pending requests can be cancelled.');
+            }
 
-    respond(['leave' => $updatedLeave]);
+            $db->prepare("UPDATE leaves SET status = 'cancelled', updated_at = ? WHERE id = ?")
+               ->execute([$IST_NOW, $id]);
+        } else {
+            // Admin can approve or reject
+            if (!in_array($newStatus, ['approved', 'rejected'], true)) {
+                respondError('Status must be approved or rejected.');
+            }
+            if ($existing['status'] !== 'pending') {
+                respondError('Only pending requests can be approved/rejected.');
+            }
+
+            $adminNote = trim($body['adminNote'] ?? '');
+
+            $db->prepare("UPDATE leaves SET status = ?, approved_by = ?, admin_note = ?, updated_at = ? WHERE id = ?")
+               ->execute([$newStatus, $user['id'], $adminNote ?: null, $IST_NOW, $id]);
+        }
+
+        // Fetch updated
+        $fetch = $db->prepare("
+            SELECT l.*, u.name AS user_name, u.avatar AS user_avatar, u.color AS user_color,
+                   u.department, ua.name AS approved_by_name
+            FROM leaves l
+            JOIN users u ON l.user_id = u.id
+            LEFT JOIN users ua ON l.approved_by = ua.id
+            WHERE l.id = ?
+        ");
+        $fetch->execute([$id]);
+        $updatedRow = $fetch->fetch();
+        $updatedLeave = $updatedRow ? formatLeave($updatedRow) : null;
+
+        // Notify the member (silently — never block the response)
+        if ($user['role'] === 'admin' && $notifyLoaded) {
+            try {
+                $memberRow = $db->prepare('SELECT name, email, phone FROM users WHERE id = ?');
+                $memberRow->execute([$existing['user_id']]);
+                $member = $memberRow->fetch();
+
+                if ($member) {
+                    $emoji = $newStatus === 'approved' ? '✅' : '❌';
+                    $statusLabel = ucfirst($newStatus);
+
+                    $msg = "$emoji *Aikya Task Portal*\n\n"
+                         . "🏖️ *Leave Request $statusLabel*\n"
+                         . "Your leave from {$existing['from_date']} to {$existing['to_date']} has been *$statusLabel*."
+                         . ($adminNote ? "\n📝 Note: $adminNote" : '');
+
+                    if ($member['phone'] && function_exists('sendWhatsApp')) {
+                        @sendWhatsApp($member['phone'], $msg);
+                    }
+
+                    if ($member['email'] && function_exists('sendEmail') && function_exists('emailTemplate')) {
+                        $html = emailTemplate("Leave Request $statusLabel", "
+                            <p>Your leave request has been <strong>$statusLabel</strong> by {$user['name']}.</p>
+                            <table>
+                                <tr><td>📅 From</td><td>{$existing['from_date']}</td></tr>
+                                <tr><td>📅 To</td><td>{$existing['to_date']}</td></tr>
+                                <tr><td>📊 Status</td><td><strong>$emoji $statusLabel</strong></td></tr>"
+                            . ($adminNote ? "<tr><td>📝 Note</td><td>$adminNote</td></tr>" : '') . "
+                            </table>
+                        ");
+                        @sendEmail($member['email'], $member['name'], "$emoji Leave $statusLabel — Aikya Portal", $html);
+                    }
+                }
+            } catch (\Throwable $e) { /* silent fail — don't block status update */ }
+        }
+
+        respond(['leave' => $updatedLeave]);
+
+    } catch (\Throwable $e) {
+        respondError('Failed to update leave: ' . $e->getMessage(), 500);
+    }
 }
 
 // ── DELETE — remove leave (admin only) ───────────────────────
 if ($method === 'DELETE') {
     requireAdmin();
-    $id = $_GET['id'] ?? '';
-    if (!$id) respondError('Leave ID required.');
+    try {
+        $id = $_GET['id'] ?? '';
+        if (!$id) respondError('Leave ID required.');
 
-    $check = $db->prepare('SELECT id FROM leaves WHERE id = ?');
-    $check->execute([$id]);
-    if (!$check->fetch()) respondError('Leave request not found.', 404);
+        $check = $db->prepare('SELECT id FROM leaves WHERE id = ?');
+        $check->execute([$id]);
+        if (!$check->fetch()) respondError('Leave request not found.', 404);
 
-    $db->prepare('DELETE FROM leaves WHERE id = ?')->execute([$id]);
-    respond(['success' => true]);
+        $db->prepare('DELETE FROM leaves WHERE id = ?')->execute([$id]);
+        respond(['success' => true]);
+    } catch (\Throwable $e) {
+        respondError('Failed to delete leave: ' . $e->getMessage(), 500);
+    }
 }
 
 respondError('Method not allowed.', 405);
