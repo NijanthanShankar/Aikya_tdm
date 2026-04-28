@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { api } from '../utils/api';
 import { T, ROLE_LABELS, ROLE_COLORS } from '../utils/theme';
 import { Sidebar } from '../components/layout/Sidebar';
 import { Header } from '../components/layout/Header';
@@ -7,11 +8,12 @@ import {
   Button, Card, Input, Textarea, Alert, FormGrid, AvatarCircle,
   SectionTitle, Badge, Spinner,
 } from '../components/ui';
-import { User, Mail, Phone, Building2, Lock, Camera, CheckCircle2 } from 'lucide-react';
+import { User, Mail, Phone, Building2, Lock, Camera, CheckCircle2, Upload, Trash2, ImagePlus } from 'lucide-react';
 
 export default function Profile() {
   const { currentUser, updateProfile, changePassword } = useAuth();
   const roleColor = ROLE_COLORS[currentUser?.role] || T.primary;
+  const fileInputRef = useRef(null);
 
   // Profile form
   const [profile, setProfile] = useState({
@@ -24,6 +26,8 @@ export default function Profile() {
   const [savingProfile,   setSavingProfile]   = useState(false);
   const [profileSuccess,  setProfileSuccess]  = useState(false);
   const [profileError,    setProfileError]    = useState('');
+  const [uploading,       setUploading]       = useState(false);
+  const [uploadProgress,  setUploadProgress]  = useState('');
 
   // Password form
   const [passwords, setPasswords] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
@@ -34,6 +38,47 @@ export default function Profile() {
 
   const profileUpd = (k) => (e) => setProfile((p) => ({ ...p, [k]: e.target.value }));
   const passUpd    = (k) => (e) => setPasswords((p) => ({ ...p, [k]: e.target.value }));
+
+  // ── Handle avatar upload ─────────────────────────────────────
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      setProfileError('Please select an image file (JPG, PNG, GIF, or WebP).');
+      return;
+    }
+
+    // Validate file size (max 5 MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setProfileError('Image must be smaller than 5 MB.');
+      return;
+    }
+
+    setUploading(true);
+    setProfileError('');
+    setUploadProgress('Uploading photo...');
+
+    try {
+      const result = await api.upload(file);
+      setProfile((p) => ({ ...p, avatarUrl: result.url }));
+      setUploadProgress('Photo uploaded! Click "Save Changes" to apply.');
+      setTimeout(() => setUploadProgress(''), 4000);
+    } catch (err) {
+      setProfileError('Upload failed: ' + err.message);
+    }
+    setUploading(false);
+
+    // Reset file input
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleRemoveAvatar = () => {
+    setProfile((p) => ({ ...p, avatarUrl: '' }));
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
   // ── Save profile ─────────────────────────────────────────────
   const handleSaveProfile = async (e) => {
@@ -96,11 +141,56 @@ export default function Profile() {
               {/* Avatar */}
               <Card style={{ padding: '28px 24px', textAlign: 'center' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
-                  {profile.avatarUrl ? (
-                    <img src={profile.avatarUrl} alt={profile.name} style={{ width: 90, height: 90, borderRadius: 28, objectFit: 'cover', boxShadow: `0 8px 24px ${roleColor}30` }} />
-                  ) : (
-                    <div style={{ width: 90, height: 90, borderRadius: 28, background: roleColor, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontFamily: 'Outfit', fontWeight: 800, fontSize: 34, boxShadow: `0 8px 24px ${roleColor}30` }}>
-                      {avatar}
+                  {/* Avatar with upload overlay */}
+                  <div style={{ position: 'relative', display: 'inline-block' }}>
+                    {profile.avatarUrl ? (
+                      <img src={profile.avatarUrl} alt={profile.name} style={{ width: 100, height: 100, borderRadius: 30, objectFit: 'cover', boxShadow: `0 8px 24px ${roleColor}30`, border: `3px solid ${roleColor}25` }} />
+                    ) : (
+                      <div style={{ width: 100, height: 100, borderRadius: 30, background: `linear-gradient(135deg, ${roleColor}, ${roleColor}cc)`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontFamily: 'Outfit', fontWeight: 800, fontSize: 36, boxShadow: `0 8px 24px ${roleColor}30`, border: `3px solid ${roleColor}25` }}>
+                        {avatar}
+                      </div>
+                    )}
+                    {/* Upload overlay button */}
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading}
+                      style={{
+                        position: 'absolute', bottom: -4, right: -4,
+                        width: 34, height: 34, borderRadius: 12,
+                        background: T.primary, border: `3px solid ${T.cardBg}`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: uploading ? 'wait' : 'pointer',
+                        boxShadow: '0 4px 12px rgba(124,58,237,0.35)',
+                        transition: 'transform 0.15s, box-shadow 0.15s',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.1)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(124,58,237,0.5)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(124,58,237,0.35)'; }}
+                      title="Upload profile photo"
+                    >
+                      {uploading ? (
+                        <Spinner size={14} color="#fff" />
+                      ) : (
+                        <Camera size={15} color="#fff" strokeWidth={2.5} />
+                      )}
+                    </button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/gif,image/webp"
+                      onChange={handleAvatarUpload}
+                      style={{ display: 'none' }}
+                    />
+                  </div>
+
+                  {/* Upload hint */}
+                  {uploading && (
+                    <div style={{ fontSize: 12, color: T.primary, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Spinner size={12} color={T.primary} /> Uploading...
+                    </div>
+                  )}
+                  {uploadProgress && !uploading && (
+                    <div style={{ fontSize: 11, color: T.success, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <CheckCircle2 size={12} /> {uploadProgress}
                     </div>
                   )}
 
@@ -120,6 +210,42 @@ export default function Profile() {
                       <Phone size={14} /> {profile.phone}
                     </div>
                   )}
+
+                  {/* Quick actions for avatar */}
+                  <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading}
+                      style={{
+                        padding: '6px 14px', borderRadius: 10, border: `1.5px solid ${T.primary}25`,
+                        background: T.primaryLight, color: T.primary, fontSize: 12, fontWeight: 700,
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+                        fontFamily: 'DM Sans, sans-serif', transition: 'all 0.15s',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = `${T.primary}20`; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = T.primaryLight; }}
+                    >
+                      <ImagePlus size={13} /> {profile.avatarUrl ? 'Change' : 'Upload'} Photo
+                    </button>
+                    {profile.avatarUrl && (
+                      <button
+                        onClick={handleRemoveAvatar}
+                        style={{
+                          padding: '6px 14px', borderRadius: 10, border: `1.5px solid ${T.danger}25`,
+                          background: T.dangerLight || '#fee2e2', color: T.danger, fontSize: 12, fontWeight: 700,
+                          cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+                          fontFamily: 'DM Sans, sans-serif', transition: 'all 0.15s',
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = `${T.danger}15`; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = T.dangerLight || '#fee2e2'; }}
+                      >
+                        <Trash2 size={13} /> Remove
+                      </button>
+                    )}
+                  </div>
+                  <p style={{ fontSize: 11, color: T.textMuted, margin: 0, textAlign: 'center', lineHeight: 1.4 }}>
+                    JPG, PNG, GIF or WebP · Max 5 MB
+                  </p>
                 </div>
               </Card>
 
@@ -164,18 +290,6 @@ export default function Profile() {
                     <Input label="Phone Number" value={profile.phone} onChange={profileUpd('phone')} placeholder="+91 9876543210" id="pf-phone" />
                     <Input label="Department" value={profile.department} onChange={profileUpd('department')} placeholder="e.g. Design" id="pf-dept" />
                   </FormGrid>
-
-                  {/* Avatar URL */}
-                  <div>
-                    <Input
-                      label="Profile Photo URL (optional)"
-                      value={profile.avatarUrl}
-                      onChange={profileUpd('avatarUrl')}
-                      placeholder="https://example.com/your-photo.jpg"
-                      id="pf-avatar"
-                    />
-                    <p style={{ fontSize: 12, color: T.textMuted, marginTop: 6 }}>Paste a direct image URL. If blank, your initials will be used.</p>
-                  </div>
 
                   {profileError   && <Alert type="danger">{profileError}</Alert>}
                   {profileSuccess && <Alert type="success"><CheckCircle2 size={14} style={{ display: 'inline', marginRight: 6 }} />Profile updated successfully!</Alert>}
