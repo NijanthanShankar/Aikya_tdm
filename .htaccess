@@ -1,14 +1,5 @@
 Options -MultiViews
 RewriteEngine On
-
-# Serve API PHP files directly
-RewriteCond %{REQUEST_URI} ^/api/
-RewriteRule ^ - [L]
-
-# If the request matches a real file in dist/ (JS, CSS, images), serve it
-RewriteCond %{DOCUMENT_ROOT}/dist%{REQUEST_URI} -f
-RewriteRule ^(.*)$ dist/$1 [L]
-
-# Everything else → dist/index.html (React Router SPA fallback)
 RewriteCond %{REQUEST_FILENAME} !-f
-RewriteRule ^ dist/index.html [QSA,L]
+RewriteCond %{REQUEST_URI} !^/api/
+RewriteRule ^ index.html [QSA,L]
