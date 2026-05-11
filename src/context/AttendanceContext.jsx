@@ -24,14 +24,11 @@ export function formatHours(hours) {
 
 export function formatTime(datetimeStr) {
   if (!datetimeStr) return '—';
-  // Parse as local time (IST) — server already stores IST
-  // new Date('YYYY-MM-DD HH:MM:SS') treats it as UTC; we must parse manually
-  const [datePart, timePart] = datetimeStr.split(/[T ]/);
-  if (!timePart) return '—';
-  const [y, mo, d] = datePart.split('-').map(Number);
-  const [h, mi, s] = timePart.split(':').map(Number);
-  const local = new Date(y, mo - 1, d, h, mi, s || 0);
-  return local.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+  // Supabase returns ISO 8601 UTC strings — convert to IST for display
+  return new Date(datetimeStr).toLocaleTimeString('en-IN', {
+    hour: '2-digit', minute: '2-digit', hour12: true,
+    timeZone: 'Asia/Kolkata',
+  });
 }
 
 // Get GPS location + reverse-geocode (OpenStreetMap Nominatim, free, no key needed)
