@@ -1,33 +1,22 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
 import { api } from '../utils/api';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
-  const [users,       setUsers]       = useState([]);
-  const [loading,     setLoading]     = useState(true);
+  const [users, setUsers]             = useState([]);
+  const [loading, setLoading]         = useState(true);
 
-  // ── Restore session on mount ───────────────────────────────
   useEffect(() => {
-    // Check for existing session
     api.auth.me()
       .then(({ user }) => {
         setCurrentUser(user);
+        // Both admin and manager need the users list (for task assignment, team view, etc.)
         if (user?.role === 'admin' || user?.role === 'manager') loadUsers();
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-
-    // Listen to Supabase auth state changes (login/logout/token refresh)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
-      if (event === 'SIGNED_OUT') {
-        setCurrentUser(null);
-        setUsers([]);
-      }
-    });
-    return () => subscription.unsubscribe();
   }, []);
 
   const loadUsers = async () => {
@@ -54,10 +43,11 @@ export function AuthProvider({ children }) {
     setUsers([]);
   };
 
+  // ── Admin: manage team members ────────────────────────────────
   const createUser = async (payload) => {
     try {
       const { user } = await api.users.create(payload);
-      setUsers(prev => [...prev, user]);
+      setUsers((prev) => [...prev, user]);
       return { success: true, user };
     } catch (err) {
       return { success: false, error: err.message };
@@ -67,7 +57,7 @@ export function AuthProvider({ children }) {
   const updateUser = async (id, updates) => {
     try {
       const { user } = await api.users.update(id, updates);
-      setUsers(prev => prev.map(u => (u.id === id ? { ...u, ...user } : u)));
+      setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, ...user } : u)));
       return { success: true, user };
     } catch (err) {
       return { success: false, error: err.message };
@@ -77,17 +67,18 @@ export function AuthProvider({ children }) {
   const deleteUser = async (id) => {
     try {
       await api.users.remove(id);
-      setUsers(prev => prev.filter(u => u.id !== id));
+      setUsers((prev) => prev.filter((u) => u.id !== id));
       return { success: true };
     } catch (err) {
       return { success: false, error: err.message };
     }
   };
 
+  // ── Self: update own profile ──────────────────────────────────
   const updateProfile = async (data) => {
     try {
       const { user } = await api.users.updateSelf(data);
-      setCurrentUser(prev => ({ ...prev, ...user }));
+      setCurrentUser((prev) => ({ ...prev, ...user }));
       return { success: true, user };
     } catch (err) {
       return { success: false, error: err.message };
